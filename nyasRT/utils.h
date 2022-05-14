@@ -268,6 +268,8 @@ public:
 
 template<typename T> class Buffer2D final {
 public:
+    typedef T eltype;
+
     Buffer2D();
     explicit Buffer2D(uint64_t n_rows, uint64_t n_cols);
 
