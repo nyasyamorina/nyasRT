@@ -1,0 +1,5 @@
+#pragma once
+
+//#define RANDOM_WITH_TIME
+#define USE_SHIRLEY_CIRCLE_MAPPING
+//#define LOAD_SHOW_SAMPLE_FUNCTIONS
