@@ -28,9 +28,10 @@ double dot(Vec2 const& u, Vec2 const& v) {
 Vec2 normalize(Vec2 const& v) {
     return v / abs(v);
 }
-void absnorm(Vec2 & v, double & d) {
-    d = abs(v);
+double absnorm(Vec2 & v) {
+    auto d = abs(v);
     v /= d;
+    return d;
 }
 Vec2 spherical(double r, double phi) {
     return Vec2(r * cos(phi), r * sin(phi));
@@ -57,9 +58,10 @@ Vec3 cross(Vec3 const& u, Vec3 const& v) {
 Vec3 normalize(Vec3 const& v) {
     return v / abs(v);
 }
-void absnorm(Vec3 & v, double & d) {
-    d = abs(v);
+double absnorm(Vec3 & v) {
+    auto d = abs(v);
     v /= d;
+    return d;
 }
 Vec3 spherical(double r, double theta, double phi) {
     auto r_st = r * sin(theta);
@@ -466,7 +468,7 @@ ostream & operator <<(ostream & o, Ray const& ray) {
 ******************************************************************************/
 
 HitRecord::HitRecord()
-    : hit(false), t(numeric_limits<double>::infinity()), object_idx(0) {}
+    : hit(false), t(numeric_limits<double>::infinity()), object_p(nullptr) {}
 
 
 /******************************************************************************

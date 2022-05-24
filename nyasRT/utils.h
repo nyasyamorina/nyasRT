@@ -2,19 +2,8 @@
 
 #include <iostream>
 #include <stdint.h>
+#include "setup.h"
 
-
-/* types */
-
-struct Vec2;
-struct Vec3;
-struct RGB;
-struct Ray;
-struct HitRecord;
-struct LocalCoord;
-
-template<typename T> class Buffer2D;
-class Image;
 
 
 /* vec functions */
@@ -23,7 +12,7 @@ double abs(Vec2 const&);
 double abs2(Vec2 const&);
 double dot(Vec2 const&, Vec2 const&);
 Vec2 normalize(Vec2 const&);
-void absnorm(Vec2 &, double &);
+double absnorm(Vec2 &);
 Vec2 spherical(double r, double phi);
 double to_spherical(Vec2 const&, double & phi);
 
@@ -32,7 +21,7 @@ double abs2(Vec3 const&);
 double dot(Vec3 const&, Vec3 const&);
 Vec3 cross(Vec3 const&, Vec3 const&);
 Vec3 normalize(Vec3 const&);
-void absnorm(Vec3 &, double &);
+double absnorm(Vec3 &);
 Vec3 spherical(double r, double theta, double phi);
 double to_spherical(Vec3 const&, double & theta, double & phi);
 Vec3 corrnormal(Vec3 const& n, Vec3 const& o);
@@ -230,8 +219,9 @@ public:
     bool hit;
     double t;
     Vec3 point;
+    Vec2 uv;
     Vec3 normal;
-    uint64_t object_idx;
+    Object * object_p;
 
     HitRecord();
 

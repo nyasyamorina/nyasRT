@@ -27,6 +27,9 @@
     <ClCompile Include="objects.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="worlds.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="utils.h">
@@ -42,6 +45,9 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="objects.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="worlds.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

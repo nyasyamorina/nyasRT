@@ -1,23 +1,9 @@
 #pragma once
 
-#include "setup.h"
 #include <stdint.h>
-#include <memory>
+#include "setup.h"
 #include "utils.h"
 
-
-/* abstract types */
-
-class Generator;
-template<typename V> class SampleType;
-
-typedef std::shared_ptr<Generator> Generatorp;
-
-
-/* sampler */
-
-struct SamplerArgs;
-template<typename ST> class Sampler;
 
 
 #ifdef LOAD_SHOW_SAMPLE_FUNCTIONS

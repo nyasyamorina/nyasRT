@@ -159,6 +159,7 @@
     <ClCompile Include="nyasRT.cpp" />
     <ClCompile Include="samples.cpp" />
     <ClCompile Include="utils.cpp" />
+    <ClCompile Include="worlds.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="objects.h" />
@@ -166,6 +167,7 @@
     <ClInclude Include="samples.h" />
     <ClInclude Include="setup.h" />
     <ClInclude Include="utils.h" />
+    <ClInclude Include="worlds.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\README.md" />
