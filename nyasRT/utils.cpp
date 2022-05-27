@@ -451,6 +451,8 @@ ostream & operator <<(ostream & o, RGB const & color) {
 **********************************  Ray  **************************************
 ******************************************************************************/
 
+Ray::Ray()
+    : point(0), direction(0) {}
 Ray::Ray(Vec3 const& p, Vec3 const& d)
     : point(p), direction(d) {}
 
@@ -467,9 +469,17 @@ ostream & operator <<(ostream & o, Ray const& ray) {
 ********************************  HitRecord  **********************************
 ******************************************************************************/
 
-HitRecord::HitRecord()
-    : hit(false), t(numeric_limits<double>::infinity()), object_p(nullptr) {}
+HitRecord::HitRecord(World & w, Ray const& r, uint32_t d, double t_)
+    : world(w), ray(r), depth(d), hit(false), object_p(nullptr), t(t_) {}
 
+void HitRecord::set_values(Object & o, double t_, Vec3 const& n, Vec2 const& uv) {
+    this->hit = true;
+    this->object_p = &o;
+    this->t = t_;
+    this->point = this->ray.at(t_);
+    this->normal = corrnormal(n, this->ray.direction);
+    this->tex = uv;
+}
 
 /******************************************************************************
 ********************************  LocalCoord  *********************************

@@ -1,12 +1,22 @@
 #pragma once
 
+#include <stdint.h>
 #include <memory>
 
+
+
+/******************************************************************************
+*********************************  Options  ***********************************
+******************************************************************************/
 
 //#define RANDOM_WITH_TIME
 #define USE_SHIRLEY_CIRCLE_MAPPING
 //#define LOAD_SHOW_SAMPLE_FUNCTIONS
 
+
+/******************************************************************************
+**********************************  types  ************************************
+******************************************************************************/
 
 /* basic types */
 
@@ -28,7 +38,6 @@ class Generator;
 template<typename V> class SampleType;
 typedef std::shared_ptr<Generator> Generatorp;
 
-struct SamplerArgs;
 template<typename ST> class Sampler;
 template<typename ST> using Samplerp = std::shared_ptr<Sampler<ST>>;
 
@@ -57,5 +66,8 @@ typedef std::shared_ptr<Sky> Skyp;
 
 class Camera;
 typedef std::shared_ptr<Camera> Camerap;
+
+class RayTracer;
+typedef std::shared_ptr<RayTracer> RayTracerp;
 
 class World;

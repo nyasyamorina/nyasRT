@@ -1,8 +1,10 @@
 #pragma once
 
+#include <numeric>
 #include <iostream>
-#include <stdint.h>
 #include "setup.h"
+
+constexpr double inf = std::numeric_limits<double>::infinity();
 
 
 
@@ -198,7 +200,8 @@ struct Ray final {
 public:
     Vec3 point, direction;
 
-    Ray(Vec3 const& p, Vec3 const& d);
+    Ray();
+    explicit Ray(Vec3 const& p, Vec3 const& d);
 
     Ray(Ray const&) = default;
     Ray(Ray &&) = default;
@@ -216,19 +219,24 @@ std::ostream & operator <<(std::ostream &, Ray const&);
 
 struct HitRecord final {
 public:
-    bool hit;
-    double t;
-    Vec3 point;
-    Vec2 uv;
-    Vec3 normal;
-    Object * object_p;
+    World & world;                  // world reference
+    Ray ray;                        // currently calculating ray
+    uint32_t depth;                 // depth of ray
+    bool hit;                       // is hit an object?
+    Object * object_p;              // hitted object pointer
+    double t;                       // distance traveled by the ray
+    Vec3 point;                     // hitted point on object
+    Vec3 normal;                    // normal on hitted point
+    Vec2 tex;                       // texture coord on hitted point
 
-    HitRecord();
+    explicit HitRecord(World &, Ray const&, uint32_t, double t_);
 
     HitRecord(HitRecord const&) = default;
     HitRecord(HitRecord &&) = default;
     HitRecord & operator =(HitRecord const&) = default;
     HitRecord & operator =(HitRecord &&) = default;
+
+    void set_values(Object &, double, Vec3 const& n, Vec2 const&);
 };
 
 

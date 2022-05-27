@@ -117,11 +117,11 @@ template<> Image show_samples(Sampler<Hemisphere> const& sampler, uint64_t set) 
     return im;
 }
 
-Image show_gen_perform(SamplerArgs const& args) {
+Image show_gen_perform(uint64_t n_sets, uint64_t n_samples, Generatorp gen) {
     constexpr double scaler = 10.37 / 512;
     auto im = Image(512, 512);
-    auto sampler = Sampler(args, sample_types::Square());
-    auto n_samples = sampler.samples_per_set();
+    auto sampler = Sampler(sample_types::Square(), n_sets, n_samples, gen);
+    n_samples = sampler.samples_per_set();
     for (uint64_t h = 0; h < 512; ++h) {
         for (uint64_t w = 0; w < 512; ++w) {
             auto color = 0.0f;
@@ -144,43 +144,39 @@ Image show_gen_perform(SamplerArgs const& args) {
 ************************************  Sampler  ********************************
 ******************************************************************************/
 
-SamplerArgs::SamplerArgs()
-    : samples_per_set(0), sets(0), generator_p(nullptr) {}
-SamplerArgs::SamplerArgs(uint64_t n_samples)
-    : SamplerArgs(1, n_samples, make_shared<MultiJ>()) {}
-SamplerArgs::SamplerArgs(uint64_t n_samples, Generatorp gen)
-    : SamplerArgs(1, n_samples, gen) {}
-SamplerArgs::SamplerArgs(uint64_t n_samples, uint64_t n_sets)
-    : SamplerArgs(n_samples, n_sets, make_shared<MultiJ>()) {}
-SamplerArgs::SamplerArgs(uint64_t n_samples, uint64_t n_sets, Generatorp gen)
-    : samples_per_set(n_samples), sets(n_sets), generator_p(gen) {}
-
-
 template class Sampler<Square>;
 template class Sampler<Circle>;
 template class Sampler<Sphere>;
 template class Sampler<Hemisphere>;
 
-template<typename ST> Sampler<ST>::Sampler(SamplerArgs const& args, ST const& type)
-    : _samples(), _set(0), _idx(0) {
-    if (args.sets > 0 || args.samples_per_set > 0 || args.generator_p != nullptr) {
-        auto unif_samples = args.generator_p->generate(args.samples_per_set, args.sets);
-        auto n_sets = unif_samples.get_rows(), n_samples = unif_samples.get_cols();
-        this->_samples = Buffer2D<vtype>(n_sets, n_samples);
+template<typename ST> Sampler<ST>::Sampler()
+    : _samples(), _set(0), _idx(0) {}
 
-        vtype ** this_rows = this->_samples.data_ptr();
-        auto unif_rows = unif_samples.data_ptr();
-        for (uint64_t set = 0; set < n_sets; ++set) {
-            vtype * this_samples = *this_rows;
-            auto unif_samples = *(unif_rows++);
-            for (uint64_t idx = 0; idx < n_samples; ++idx) {
-                *(this_samples++) = type.map_sample(*(unif_samples++));
-            }
-            this_samples = *(this_rows++);
-            for (uint64_t idx = 0; idx < n_samples; ++idx) {
-                uint64_t tar = randint(n_samples);
-                swap(this_samples[idx], this_samples[tar]);
-            }
+template<typename ST> Sampler<ST>::Sampler(ST const& type, uint64_t n_samples)
+    : Sampler(type, 1, n_samples, make_shared<MultiJ>()) {}
+template<typename ST> Sampler<ST>::Sampler(ST const& type, uint64_t n_samples, Generatorp gen)
+    : Sampler(type, 1, n_samples, gen) {}
+template<typename ST> Sampler<ST>::Sampler(ST const& type, uint64_t n_sets, uint64_t n_samples)
+    : Sampler(type, n_sets, n_samples, make_shared<MultiJ>()) {}
+
+template<typename ST> Sampler<ST>::Sampler(ST const& type, uint64_t n_sets, uint64_t n_samples, Generatorp gen)
+    : _samples(), _set(0), _idx(0) {
+    auto unif_samples = gen->generate(n_sets, n_samples);
+    n_sets = unif_samples.get_rows(), n_samples = unif_samples.get_cols();
+    this->_samples = Buffer2D<vtype>(n_sets, n_samples);
+
+    vtype ** this_rows = this->_samples.data_ptr();
+    auto unif_rows = unif_samples.data_ptr();
+    for (uint64_t set = 0; set < n_sets; ++set) {
+        vtype * this_samples = *this_rows;
+        auto unif_samples = *(unif_rows++);
+        for (uint64_t idx = 0; idx < n_samples; ++idx) {
+            *(this_samples++) = type.map_sample(*(unif_samples++));
+        }
+        this_samples = *(this_rows++);
+        for (uint64_t idx = 0; idx < n_samples; ++idx) {
+            uint64_t tar = randint(n_samples);
+            swap(this_samples[idx], this_samples[tar]);
         }
     }
 }
@@ -209,8 +205,6 @@ template<typename ST> Sampler<ST>::vtype const& Sampler<ST>::operator ()(uint64_
 /******************************************************************************
 **********************************  generators  *******************************
 ******************************************************************************/
-
-using namespace generators;
 
 /***********************************  Uniform  *******************************/
 

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <stdint.h>
 #include "setup.h"
 #include "utils.h"
 
@@ -11,7 +10,7 @@
 /* show sample functions */
 
 template<typename ST> Image show_samples(Sampler<ST> const& sampler, uint64_t set = 0);
-Image show_gen_perform(SamplerArgs const&);
+Image show_gen_perform(uint64_t n_sets, uint64_t n_samples, Generatorp gen);
 
 #endif // LOAD_SHOW_SAMPLE_FUNCTIONS
 
@@ -42,24 +41,16 @@ public:
 ************************************  Sampler  ********************************
 ******************************************************************************/
 
-struct SamplerArgs final {
-public:
-    uint64_t sets, samples_per_set;
-    Generatorp generator_p;
-
-    SamplerArgs();
-    explicit SamplerArgs(uint64_t n_samples);
-    explicit SamplerArgs(uint64_t n_samples, Generatorp gen);
-    explicit SamplerArgs(uint64_t n_sets, uint64_t n_samples);
-    explicit SamplerArgs(uint64_t n_sets, uint64_t n_samples, Generatorp gen);
-};
-
 template<typename ST> class Sampler final {
 public:
     typedef ST stype;
     typedef ST::vtype vtype;
 
-    explicit Sampler(SamplerArgs const&, ST const&);
+    Sampler();
+    explicit Sampler(ST const&, uint64_t n_samples);
+    explicit Sampler(ST const&, uint64_t n_samples, Generatorp);
+    explicit Sampler(ST const&, uint64_t n_sets, uint64_t n_samples);
+    explicit Sampler(ST const&, uint64_t n_sets, uint64_t n_samples, Generatorp);
 
     uint64_t sets() const;
     uint64_t samples_per_set() const;
