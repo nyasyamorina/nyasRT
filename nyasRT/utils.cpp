@@ -80,6 +80,20 @@ Vec3 reflect(Vec3 const& n, Vec3 const& i) {
     return i - 2.0 * dot(n, i) * n;
 }
 
+Vec3 correct_viewup(Vec3 const& d, double alpha) {
+    double theta, phi;
+    to_spherical(d, theta, phi);
+    return correct_viewup(theta, phi, alpha);
+}
+Vec3 correct_viewup(double theta, double phi, double alpha) {
+    auto st = sin(theta), ct = cos(theta);
+    auto sp = sin(phi), cp = cos(phi);
+    auto sa = sin(alpha), ca = cos(alpha);
+    return Vec3(-sp * sa - ct * cp * ca,
+                 cp * sa - ct * sp * ca,
+                 st * ca);
+}
+
 
 /* random functions */
 
@@ -472,6 +486,13 @@ ostream & operator <<(ostream & o, Ray const& ray) {
 HitRecord::HitRecord(World & w, Ray const& r, uint32_t d, double t_)
     : world(w), ray(r), depth(d), hit(false), object_p(nullptr), t(t_) {}
 
+void HitRecord::correct_normal() {
+    if (dot(this->ray.direction, this->normal) > 0.) {
+        this->normal.x = -this->normal.x;
+        this->normal.y = -this->normal.y;
+        this->normal.z = -this->normal.z;
+    }
+}
 void HitRecord::set_values(Object & o, double t_, Vec3 const& n, Vec2 const& uv) {
     this->hit = true;
     this->object_p = &o;
@@ -508,69 +529,69 @@ template class Buffer2D<uint8_t>;
 template class Buffer2D<Vec2>;
 template class Buffer2D<Vec3>;
 
-template<typename T> Buffer2D<T>::Buffer2D()
+template<class T> Buffer2D<T>::Buffer2D()
     : _data(nullptr), _rows(0), _cols(0) {}
-template<typename T> Buffer2D<T>::Buffer2D(uint64_t n_rows, uint64_t n_cols)
+template<class T> Buffer2D<T>::Buffer2D(uint64_t n_rows, uint64_t n_cols)
     : _rows(n_rows), _cols(n_cols) {
     this->_alloc_buff();
 }
 
-template<typename T> Buffer2D<T>::Buffer2D(Buffer2D<T> const& other)
+template<class T> Buffer2D<T>::Buffer2D(Buffer2D<T> const& other)
     : Buffer2D() {
     this->_copy_from(other);
 }
-template<typename T> Buffer2D<T>::Buffer2D(Buffer2D<T> && other) noexcept
+template<class T> Buffer2D<T>::Buffer2D(Buffer2D<T> && other) noexcept
     : Buffer2D() {
     swap(this->_data, other._data);
     swap(this->_rows, other._rows);
     swap(this->_cols, other._cols);
 }
-template<typename T> Buffer2D<T> & Buffer2D<T>::operator =(Buffer2D<T> const& other) {
+template<class T> Buffer2D<T> & Buffer2D<T>::operator =(Buffer2D<T> const& other) {
     this->_copy_from(other);
     return *this;
 }
-template<typename T> Buffer2D<T> & Buffer2D<T>::operator =(Buffer2D<T> && other) noexcept {
+template<class T> Buffer2D<T> & Buffer2D<T>::operator =(Buffer2D<T> && other) noexcept {
     swap(this->_data, other._data);
     swap(this->_rows, other._rows);
     swap(this->_cols, other._cols);
     return *this;
 }
 
-template<typename T> Buffer2D<T>::~Buffer2D() {
+template<class T> Buffer2D<T>::~Buffer2D() {
     this->_dealloc_buff();
 }
 
-template<typename T> bool Buffer2D<T>::inbounds(uint64_t y, uint64_t x) const {
+template<class T> bool Buffer2D<T>::inbounds(uint64_t y, uint64_t x) const {
     return y < this->_rows && x < this->_cols;
 }
-template<typename T> uint64_t Buffer2D<T>::get_rows() const {
+template<class T> uint64_t Buffer2D<T>::get_rows() const {
     return this->_rows;
 }
-template<typename T> uint64_t Buffer2D<T>::get_cols() const {
+template<class T> uint64_t Buffer2D<T>::get_cols() const {
     return this->_cols;
 }
 
-template<typename T> T & Buffer2D<T>::operator ()(uint64_t y, uint64_t x) {
+template<class T> T & Buffer2D<T>::operator ()(uint64_t y, uint64_t x) {
     return this->_data[y][x];
 }
-template<typename T> T const& Buffer2D<T>::operator ()(uint64_t y, uint64_t x) const {
+template<class T> T const& Buffer2D<T>::operator ()(uint64_t y, uint64_t x) const {
     return this->_data[y][x];
 }
-template<typename T> T ** Buffer2D<T>::data_ptr() {
+template<class T> T ** Buffer2D<T>::data_ptr() {
     return this->_data;
 }
-template<typename T> T const* const* Buffer2D<T>::data_ptr() const {
+template<class T> T const* const* Buffer2D<T>::data_ptr() const {
     return this->_data;
 }
 
-template<typename T> void Buffer2D<T>::_alloc_buff() {
+template<class T> void Buffer2D<T>::_alloc_buff() {
     this->_data = new T *[this->_rows];
     T ** rows = this->_data;
     for (uint64_t y = 0; y < this->_rows; ++y) {
         *(rows++) = new T[this->_cols];
     }
 }
-template<typename T> void Buffer2D<T>::_dealloc_buff() {
+template<class T> void Buffer2D<T>::_dealloc_buff() {
     if (this->_data == nullptr) {
         return;
     }
@@ -581,7 +602,7 @@ template<typename T> void Buffer2D<T>::_dealloc_buff() {
     delete[] this->_data;
     this->_data = nullptr;
 }
-template<typename T> void Buffer2D<T>::_copy_from(Buffer2D<T> const& other) {
+template<class T> void Buffer2D<T>::_copy_from(Buffer2D<T> const& other) {
     this->_dealloc_buff();
     this->_rows = other._rows;
     this->_cols = other._cols;
@@ -639,8 +660,8 @@ void Image::clear(RGB const& color) {
     }
 }
 
-bool Image::inbounds(uint64_t y, uint64_t x) const {
-    return this->_buffer.inbounds(y, x);
+bool Image::inbounds(uint64_t h, uint64_t w) const {
+    return this->_buffer.inbounds(h, w);
 }
 uint64_t Image::get_height() const {
     return this->_buffer.get_rows();
@@ -649,11 +670,11 @@ uint64_t Image::get_width() const {
     return this->_buffer.get_cols();
 }
 
-RGB & Image::operator ()(uint64_t y, uint64_t x) {
-    return this->_buffer(y, x);
+RGB & Image::operator ()(uint64_t h, uint64_t w) {
+    return this->_buffer(h, w);
 }
-RGB const& Image::operator ()(uint64_t y, uint64_t x) const {
-    return this->_buffer(y, x);
+RGB const& Image::operator ()(uint64_t h, uint64_t w) const {
+    return this->_buffer(h, w);
 }
 
 bool Image::save_to(char const* filepath) const {

@@ -28,18 +28,18 @@ struct LocalCoord;
 
 struct HitRecord;
 
-template<typename T> class Buffer2D;
+template<class T> class Buffer2D;
 class Image;
 
 
 /* sample types */
 
 class Generator;
-template<typename V> class SampleType;
+template<class V> class SampleType;
 typedef std::shared_ptr<Generator> Generatorp;
 
-template<typename ST> class Sampler;
-template<typename ST> using Samplerp = std::shared_ptr<Sampler<ST>>;
+template<class ST> class Sampler;
+template<class ST> using Samplerp = std::shared_ptr<Sampler<ST>>;
 
 
 /* object types */
@@ -71,3 +71,4 @@ class RayTracer;
 typedef std::shared_ptr<RayTracer> RayTracerp;
 
 class World;
+typedef std::shared_ptr<World> Worldp;

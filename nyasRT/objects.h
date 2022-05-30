@@ -44,11 +44,12 @@ public:
 
     bool is_light() const;
 
+    virtual bool hit(Ray const&, double) = 0;
+    virtual bool hit_record(HitRecord &) = 0;
     virtual bool has_sampler() const = 0;
-    virtual bool hit(Ray const&, double) const = 0;
-    virtual bool hit_record(HitRecord &) const = 0;
     virtual Ray get_sample() = 0;
 };
+
 
 
 /******************************************************************************
@@ -96,5 +97,56 @@ namespace lights
 
         virtual Vec3 get_direction(HitRecord const&) const override;
         virtual RGB render(HitRecord const&) const override;
+    };
+}
+
+
+/******************************************************************************
+********************************  materials  **********************************
+******************************************************************************/
+
+namespace materials
+{
+
+    /*******************************  Emissive  ******************************/
+
+    class Emissive : public Material {};
+
+
+    /********************************  Matte  ********************************/
+    class Matte final : public Material {
+    public:
+        typedef Samplerp<sample_types::Hemisphere> Samplerp;
+
+        RGB color;
+        Samplerp sampler_p;
+
+        explicit Matte(RGB const&, Samplerp);
+
+        virtual RGB render(HitRecord const&);
+    };
+
+}
+
+
+/******************************************************************************
+*********************************  objects  ***********************************
+******************************************************************************/
+
+namespace objects
+{
+    /********************************  Sphere  *******************************/
+
+    class Sphere final : public Object {
+    public:
+        Vec3 point;
+        double radius;
+
+        Sphere(Materialp, Vec3 const&, double);
+
+        virtual bool hit(Ray const&, double);
+        virtual bool hit_record(HitRecord &);
+        virtual bool has_sampler() const;
+        virtual Ray get_sample();
     };
 }

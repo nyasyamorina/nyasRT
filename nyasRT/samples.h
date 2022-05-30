@@ -9,7 +9,7 @@
 
 /* show sample functions */
 
-template<typename ST> Image show_samples(Sampler<ST> const& sampler, uint64_t set = 0);
+template<class ST> Image show_samples(Sampler<ST> const& sampler, uint64_t set = 0);
 Image show_gen_perform(uint64_t n_sets, uint64_t n_samples, Generatorp gen);
 
 #endif // LOAD_SHOW_SAMPLE_FUNCTIONS
@@ -29,7 +29,7 @@ public:
 ******************************  abstract SampleType  **************************
 ******************************************************************************/
 
-template<typename V> class SampleType {
+template<class V> class SampleType {
 public:
     typedef V vtype;
 
@@ -41,7 +41,11 @@ public:
 ************************************  Sampler  ********************************
 ******************************************************************************/
 
-template<typename ST> class Sampler final {
+template<class ST, class... Args> Samplerp<ST> make_sampler(ST st, Args&&... args) {
+    return std::make_shared<Sampler<ST>>(st, std::forward<Args>(args)...);
+}
+
+template<class ST> class Sampler final {
 public:
     typedef ST stype;
     typedef ST::vtype vtype;
@@ -62,7 +66,6 @@ private:
     Buffer2D<vtype> _samples;
     uint64_t _set, _idx;
 };
-
 
 
 /******************************************************************************

@@ -149,17 +149,17 @@ template class Sampler<Circle>;
 template class Sampler<Sphere>;
 template class Sampler<Hemisphere>;
 
-template<typename ST> Sampler<ST>::Sampler()
+template<class ST> Sampler<ST>::Sampler()
     : _samples(), _set(0), _idx(0) {}
 
-template<typename ST> Sampler<ST>::Sampler(ST const& type, uint64_t n_samples)
+template<class ST> Sampler<ST>::Sampler(ST const& type, uint64_t n_samples)
     : Sampler(type, 1, n_samples, make_shared<MultiJ>()) {}
-template<typename ST> Sampler<ST>::Sampler(ST const& type, uint64_t n_samples, Generatorp gen)
+template<class ST> Sampler<ST>::Sampler(ST const& type, uint64_t n_samples, Generatorp gen)
     : Sampler(type, 1, n_samples, gen) {}
-template<typename ST> Sampler<ST>::Sampler(ST const& type, uint64_t n_sets, uint64_t n_samples)
+template<class ST> Sampler<ST>::Sampler(ST const& type, uint64_t n_sets, uint64_t n_samples)
     : Sampler(type, n_sets, n_samples, make_shared<MultiJ>()) {}
 
-template<typename ST> Sampler<ST>::Sampler(ST const& type, uint64_t n_sets, uint64_t n_samples, Generatorp gen)
+template<class ST> Sampler<ST>::Sampler(ST const& type, uint64_t n_sets, uint64_t n_samples, Generatorp gen)
     : _samples(), _set(0), _idx(0) {
     auto unif_samples = gen->generate(n_sets, n_samples);
     n_sets = unif_samples.get_rows(), n_samples = unif_samples.get_cols();
@@ -181,14 +181,14 @@ template<typename ST> Sampler<ST>::Sampler(ST const& type, uint64_t n_sets, uint
     }
 }
 
-template<typename ST> uint64_t Sampler<ST>::sets() const {
+template<class ST> uint64_t Sampler<ST>::sets() const {
     return this->_samples.get_rows();
 }
-template<typename ST> uint64_t Sampler<ST>::samples_per_set() const {
+template<class ST> uint64_t Sampler<ST>::samples_per_set() const {
     return this->_samples.get_cols();
 }
 
-template<typename ST> Sampler<ST>::vtype const& Sampler<ST>::next() {
+template<class ST> Sampler<ST>::vtype const& Sampler<ST>::next() {
     auto set = this->_set, idx = this->_idx++;
     if (this->_idx >= this->samples_per_set()) {
         this->_idx = 0;
@@ -197,7 +197,7 @@ template<typename ST> Sampler<ST>::vtype const& Sampler<ST>::next() {
     }
     return this->_samples(set, idx);
 }
-template<typename ST> Sampler<ST>::vtype const& Sampler<ST>::operator ()(uint64_t set, uint64_t idx) const {
+template<class ST> Sampler<ST>::vtype const& Sampler<ST>::operator ()(uint64_t set, uint64_t idx) const {
     return this->_samples(set, idx);
 }
 

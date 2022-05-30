@@ -29,6 +29,9 @@ double to_spherical(Vec3 const&, double & theta, double & phi);
 Vec3 corrnormal(Vec3 const& n, Vec3 const& o);
 Vec3 reflect(Vec3 const& n, Vec3 const& i);
 
+Vec3 correct_viewup(Vec3 const&, double);
+Vec3 correct_viewup(double, double, double);
+
 
 /* random functions */
 
@@ -236,6 +239,7 @@ public:
     HitRecord & operator =(HitRecord const&) = default;
     HitRecord & operator =(HitRecord &&) = default;
 
+    void correct_normal();
     void set_values(Object &, double, Vec3 const& n, Vec2 const&);
 };
 
@@ -264,7 +268,7 @@ public:
 *********************************  Buffer2D  **********************************
 ******************************************************************************/
 
-template<typename T> class Buffer2D final {
+template<class T> class Buffer2D final {
 public:
     typedef T eltype;
 
@@ -311,12 +315,12 @@ public:
     void clear();
     void clear(RGB const&);
 
-    bool inbounds(uint64_t y, uint64_t x) const;
+    bool inbounds(uint64_t h, uint64_t w) const;
     uint64_t get_height() const;
     uint64_t get_width() const;
 
-    RGB & operator ()(uint64_t y, uint64_t x);
-    RGB const& operator ()(uint64_t y, uint64_t x) const;
+    RGB & operator ()(uint64_t h, uint64_t w);
+    RGB const& operator ()(uint64_t h, uint64_t w) const;
 
     bool save_to(char const* filepath) const;
 
