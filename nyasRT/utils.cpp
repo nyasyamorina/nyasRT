@@ -3,6 +3,7 @@
 
 #include <random>
 #include <functional>
+#include <utility>
 #include <png.h>
 #ifdef RANDOM_WITH_TIME
 #include <chrono>
@@ -486,13 +487,6 @@ ostream & operator <<(ostream & o, Ray const& ray) {
 HitRecord::HitRecord(World & w, Ray const& r, uint32_t d, double t_)
     : world(w), ray(r), depth(d), hit(false), object_p(nullptr), t(t_) {}
 
-void HitRecord::correct_normal() {
-    if (dot(this->ray.direction, this->normal) > 0.) {
-        this->normal.x = -this->normal.x;
-        this->normal.y = -this->normal.y;
-        this->normal.z = -this->normal.z;
-    }
-}
 void HitRecord::set_values(Object & o, double t_, Vec3 const& n, Vec2 const& uv) {
     this->hit = true;
     this->object_p = &o;
@@ -841,4 +835,22 @@ _image_load_return:
     if (fp != nullptr) {
         fclose(fp);
     }
+}
+
+
+/******************************************************************************
+*******************************  RemapColor  **********************************
+******************************************************************************/
+
+using namespace remap_colors;
+
+RGB Clamp01::operator ()(RGB const& c) const {
+    return RGB (max(min(c.r, 1.f), 0.f),
+                max(min(c.g, 1.f), 0.f),
+                max(min(c.b, 1.f), 0.f));
+}
+
+RGB MaxTo01::operator ()(RGB const& c) const {
+    auto max_v = max(c.r, max(c.g, c.b));
+    return (max_v > 1.) ? (c / max_v) : c;
 }

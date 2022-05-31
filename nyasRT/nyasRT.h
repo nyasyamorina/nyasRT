@@ -6,4 +6,4 @@
 #include "objects.h"
 #include "worlds.h"
 
-void render_figure(World &);
+void render_figure(World &, RemapColor const&);

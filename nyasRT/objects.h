@@ -14,10 +14,21 @@ class Light {
 public:
     bool has_shadow;
 
-    explicit Light(bool shadow);
+    Light();
 
-    virtual Vec3 get_direction(HitRecord const&) const = 0;
-    virtual RGB render(HitRecord const&) const = 0;
+    virtual Vec3 get_direction(Vec3 const&) = 0;
+    virtual RGB render_light(Vec3 const&, World const&) const = 0;
+};
+
+
+/******************************************************************************
+**********************************  Light  ************************************
+******************************************************************************/
+
+class BRDF {
+public:
+    virtual float f_r(HitRecord const&, Vec3 const& i) const = 0;
+    virtual Vec3 get_sample(HitRecord const&) = 0;
 };
 
 
@@ -46,8 +57,8 @@ public:
 
     virtual bool hit(Ray const&, double) = 0;
     virtual bool hit_record(HitRecord &) = 0;
-    virtual bool has_sampler() const = 0;
-    virtual Ray get_sample() = 0;
+    virtual bool has_sampler() const;
+    virtual Ray get_sample();
 };
 
 
@@ -58,46 +69,55 @@ public:
 
 namespace lights
 {
-    /*****************************  Directional  *****************************/
+    /******************************  Parallel  *******************************/
 
-    class Directional final : public Light {
+    class Parallel final : public Light {
     public:
         RGB color;
         Vec3 direcion;
 
-        explicit Directional(RGB const&, Vec3 const&, bool shadow = true);
+        explicit Parallel(RGB const&, Vec3 const&);
 
-        virtual Vec3 get_direction(HitRecord const&) const override;
-        virtual RGB render(HitRecord const&) const override;
+        virtual Vec3 get_direction(Vec3 const&) override;
+        virtual RGB render_light(Vec3 const&, World const&) const override;
     };
 
 
-    /******************************  PointLight  *****************************/
+    /********************************  Point  ********************************/
 
-    class PointLight : public Light {
+    class Point : public Light {
     public:
         RGB color;
         Vec3 point;
 
-        explicit PointLight(RGB const&, Vec3 const&, bool shadow = true);
+        explicit Point(RGB const&, Vec3 const&);
 
-        virtual Vec3 get_direction(HitRecord const&) const override;
-        virtual RGB render(HitRecord const&) const override;
+        virtual Vec3 get_direction(Vec3 const&) override;
+        virtual RGB render_light(Vec3 const&, World const&) const override;
     };
+}
 
 
-    /****************************  DecayPointLight  **************************/
+/******************************************************************************
+**********************************  brdfs  ************************************
+******************************************************************************/
 
-    class DecayPointLight final : public PointLight {
+namespace brdfs
+{
+    /******************************  Lambertian  *****************************/
+
+    class Lambertian final : public BRDF {
     public:
-        bool decay;
-        double decay_coef;
+        Sampler<sample_types::Hemisphere> sampler;
 
-        explicit DecayPointLight(RGB const&, Vec3 const&, double decaycoef = 2., bool shadow = true);
+        template<class... Args> explicit Lambertian(Args&&... args);
 
-        virtual Vec3 get_direction(HitRecord const&) const override;
-        virtual RGB render(HitRecord const&) const override;
+        virtual float f_r(HitRecord const&, Vec3 const&) const;
+        virtual Vec3 get_sample(HitRecord const&);
     };
+
+    template<class... Args> Lambertian::Lambertian(Args&&... args)
+        : sampler(sample_types::Hemisphere(1.), std::forward<Args>(args)...) {}
 }
 
 
@@ -126,6 +146,17 @@ namespace materials
         virtual RGB render(HitRecord const&);
     };
 
+    /********************************  Opaque  *******************************/
+
+    class Opaque : public Material {
+    public:
+        BRDFp brdf_p;
+        RGB color;
+
+        explicit Opaque(BRDFp, RGB const&);
+
+        virtual RGB render(HitRecord const&);
+    };
 }
 
 
@@ -146,7 +177,5 @@ namespace objects
 
         virtual bool hit(Ray const&, double);
         virtual bool hit_record(HitRecord &);
-        virtual bool has_sampler() const;
-        virtual Ray get_sample();
     };
 }

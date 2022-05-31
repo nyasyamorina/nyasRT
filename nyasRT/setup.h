@@ -31,6 +31,8 @@ struct HitRecord;
 template<class T> class Buffer2D;
 class Image;
 
+class RemapColor;
+
 
 /* sample types */
 

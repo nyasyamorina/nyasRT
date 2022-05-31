@@ -239,7 +239,6 @@ public:
     HitRecord & operator =(HitRecord const&) = default;
     HitRecord & operator =(HitRecord &&) = default;
 
-    void correct_normal();
     void set_values(Object &, double, Vec3 const& n, Vec2 const&);
 };
 
@@ -327,3 +326,26 @@ public:
 private:
     Buffer2D<RGB> _buffer;
 };
+
+
+/******************************************************************************
+*******************************  RemapColor  **********************************
+******************************************************************************/
+
+class RemapColor {
+public:
+    virtual RGB operator ()(RGB const&) const = 0;
+};
+
+namespace remap_colors
+{
+    class Clamp01 final : public RemapColor {
+    public:
+        virtual RGB operator ()(RGB const&) const;
+    };
+
+    class MaxTo01 final : public RemapColor {
+    public:
+        virtual RGB operator ()(RGB const&) const;
+    };
+}

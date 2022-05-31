@@ -60,7 +60,7 @@ HitRecord World::hit_object(Ray const& ray, double tmax) {
     for (auto & object_p : this->object_ps) {
         if (object_p->hit_record(rec)) {}
     }
-    rec.correct_normal();
+    rec.normal = corrnormal(rec.normal, ray.direction);
     return rec;
 }
 

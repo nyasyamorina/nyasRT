@@ -64,6 +64,7 @@ public:
     RayTracerp tracer_p;
     Camerap camera_p;
     std::vector<Objectp> object_ps;
+    std::vector<Lightp> light_ps;
 
     explicit World(uint32_t);
 
