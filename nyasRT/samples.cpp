@@ -2,7 +2,7 @@
 
 #include "setup.h"
 #include <functional>
-#include <math.h>
+#include <algorithm>
 
 using namespace std;
 using namespace sample_types;
@@ -168,16 +168,12 @@ template<class ST> Sampler<ST>::Sampler(ST const& type, uint64_t n_sets, uint64_
     vtype ** this_rows = this->_samples.data_ptr();
     auto unif_rows = unif_samples.data_ptr();
     for (uint64_t set = 0; set < n_sets; ++set) {
-        vtype * this_samples = *this_rows;
+        vtype * this_samples = *(this_rows++);
         auto unif_samples = *(unif_rows++);
         for (uint64_t idx = 0; idx < n_samples; ++idx) {
             *(this_samples++) = type.map_sample(*(unif_samples++));
         }
-        this_samples = *(this_rows++);
-        for (uint64_t idx = 0; idx < n_samples; ++idx) {
-            uint64_t tar = randint(n_samples);
-            swap(this_samples[idx], this_samples[tar]);
-        }
+        shuffle(this_samples - n_samples, this_samples, bits_generator());
     }
 }
 

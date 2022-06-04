@@ -40,7 +40,7 @@ RGB RayTracer::trace_from_camera(Ray const& ray, uint32_t depth) const {
     rec.depth = depth;
     if (rec.hit) {
         if (rec.object_p->is_light()) {
-            return rec.object_p->material_p->render_emissive(rec);
+            return this->remap(rec.object_p->material_p->render_emissive(rec));
         }
         return rec.object_p->material_p->render(rec);
     }
@@ -58,9 +58,11 @@ World::World(uint32_t d)
 HitRecord World::hit_object(Ray const& ray, double tmax) {
     auto rec = HitRecord(*this, ray, 0, tmax);
     for (auto & object_p : this->object_ps) {
-        if (object_p->hit_record(rec)) {}
+        object_p->hit_record(rec);
     }
-    rec.normal = corrnormal(rec.normal, ray.direction);
+    if (rec.hit && dot(ray.direction, rec.normal) > 0.) {
+        rec.normal = -rec.normal;
+    }
     return rec;
 }
 
@@ -96,7 +98,6 @@ Pinhole::Pinhole(uint64_t h, uint64_t w, FigureSamplerp s,
 Pinhole::Pinhole(uint64_t h, uint64_t w, FigureSamplerp s,
                  Vec3 const& p, Vec3 const& d, double fov, Vec3 const& viewup)
     : Camera(h, w, s), point(p), direction(d) {
-    // aspect ratio can be calculated from `h` and `w`
     this->u = cross(d, viewup);
     this->v = cross(this->u, d);
     auto tmp = tan(fov / 2.) * abs(d);
@@ -125,7 +126,6 @@ using namespace ray_tracers;
 RT1::RT1(World & w)
     : RayTracer(w) {}
 RGB RT1::trace_from_camera(Ray const& ray, uint32_t depth) const {
-    // because there is no light source in `world`
     return this->trace(ray, depth);
 }
 
@@ -138,10 +138,8 @@ RGB RT1::trace(Ray const& ray, uint32_t depth) const {
     if (rec.hit) {
         return rec.object_p->material_p->render(rec);
     }
-    //return RGB(0.);
     auto const zenith = RGB(.7f, .9f, 1.f);
     auto const bottom = RGB(1.f);
-    // ray.direction needs to be normalize
     auto mix_v = (float)ray.direction.z * 0.5f + 0.5f;
     return zenith * mix_v + bottom * (1.f - mix_v);
 }

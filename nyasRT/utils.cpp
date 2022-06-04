@@ -1,7 +1,6 @@
 #include "utils.h"
 #include "setup.h"
 
-#include <random>
 #include <functional>
 #include <utility>
 #include <png.h>
@@ -74,9 +73,6 @@ double to_spherical(Vec3 const& v, double & theta, double & phi) {
     phi = atan2(v.y, v.x);
     return r;
 }
-Vec3 corrnormal(Vec3 const& n, Vec3 const& o) {
-    return (dot(n, o) > 0.0) ? -n : n;
-}
 Vec3 reflect(Vec3 const& n, Vec3 const& i) {
     return i - 2.0 * dot(n, i) * n;
 }
@@ -118,6 +114,9 @@ uint64_t randint(uint64_t a, uint64_t b) {
 double rand01() {
     const auto dist = uniform_real_distribution(0.0, 1.0);
     return dist(_random_gen);
+}
+std::mt19937_64 & bits_generator() {
+    return _random_gen;
 }
 
 
@@ -487,21 +486,13 @@ ostream & operator <<(ostream & o, Ray const& ray) {
 HitRecord::HitRecord(World & w, Ray const& r, uint32_t d, double t_)
     : world(w), ray(r), depth(d), hit(false), object_p(nullptr), t(t_) {}
 
-void HitRecord::set_values(Object & o, double t_, Vec3 const& n, Vec2 const& uv) {
-    this->hit = true;
-    this->object_p = &o;
-    this->t = t_;
-    this->point = this->ray.at(t_);
-    this->normal = corrnormal(n, this->ray.direction);
-    this->tex = uv;
-}
 
 /******************************************************************************
 ********************************  LocalCoord  *********************************
 ******************************************************************************/
 
 LocalCoord::LocalCoord(Vec3 const& n)
-    : LocalCoord(n, (fabs(n.x) < 1e-8) ? Vec3(0, 1, 0) : Vec3(1, 0, 0)) {}
+    : LocalCoord(n, (fabs(fabs(n.x) - 1.) < eps) ? Vec3(0, 1, 0) : Vec3(1, 0, 0)) {}
 LocalCoord::LocalCoord(Vec3 const& n, Vec3 const& u_)
     : w(n), v(cross(n, u_)) {
     this->v /= abs(this->v);

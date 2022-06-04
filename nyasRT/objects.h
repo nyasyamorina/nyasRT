@@ -57,8 +57,8 @@ public:
 
     virtual bool hit(Ray const&, double) = 0;
     virtual bool hit_record(HitRecord &) = 0;
-    virtual bool has_sampler() const;
-    virtual Ray get_sample();
+    virtual double get_area() const;
+    virtual void get_sample(HitRecord &);
 };
 
 
@@ -93,6 +93,30 @@ namespace lights
         explicit Point(RGB const&, Vec3 const&);
 
         virtual Vec3 get_direction(Vec3 const&) override;
+        virtual RGB render_light(Vec3 const&, World const&) const override;
+    };
+
+
+    /*****************************  ObjectLight  *****************************/
+
+    class ObjectLight : public Light {
+    public:
+        Objectp object_p;
+        HitRecord rec;
+
+        explicit ObjectLight(Objectp, World & w);
+
+        virtual Vec3 get_direction(Vec3 const&) override;
+        virtual RGB render_light(Vec3 const&, World const&) const override;
+    };
+
+
+    /*************************  DualSideObjectLight  *************************/
+
+    class DualSideObjectLight final : public ObjectLight {
+    public:
+        explicit DualSideObjectLight(Objectp, World & w);
+
         virtual RGB render_light(Vec3 const&, World const&) const override;
     };
 }
@@ -130,7 +154,14 @@ namespace materials
 
     /*******************************  Emissive  ******************************/
 
-    class Emissive : public Material {};
+    class Emissive : public Material {
+    public:
+        RGB color;
+
+        Emissive(RGB const&);
+
+        virtual RGB render_emissive(HitRecord const&);
+    };
 
 
     /********************************  Matte  ********************************/
@@ -172,10 +203,30 @@ namespace objects
     public:
         Vec3 point;
         double radius;
+        Samplerp<sample_types::Sphere> sampler_p;
 
-        Sphere(Materialp, Vec3 const&, double);
+        explicit Sphere(Materialp, Vec3 const&, double);
 
         virtual bool hit(Ray const&, double);
         virtual bool hit_record(HitRecord &);
+        virtual double get_area() const override;
+        virtual void get_sample(HitRecord &) override;
+    };
+
+
+    /********************************  Circle  *******************************/
+
+    class Circle final : public Object {
+    public:
+        Vec3 point, normal;
+        double radius;
+        Samplerp<sample_types::Circle> sampler_p;
+
+        explicit Circle(Materialp, Vec3 const& p, Vec3 const& n, double r);
+
+        virtual bool hit(Ray const&, double);
+        virtual bool hit_record(HitRecord &);
+        virtual double get_area() const override;
+        virtual void get_sample(HitRecord &) override;
     };
 }

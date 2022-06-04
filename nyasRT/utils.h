@@ -2,9 +2,13 @@
 
 #include <numeric>
 #include <iostream>
+#include <random>
 #include "setup.h"
 
 constexpr double inf = std::numeric_limits<double>::infinity();
+constexpr double eps = 1e-8;
+constexpr double eps_1 = 1. - eps;
+const double nanf64 = std::nan("");
 
 
 
@@ -26,7 +30,6 @@ Vec3 normalize(Vec3 const&);
 double absnorm(Vec3 &);
 Vec3 spherical(double r, double theta, double phi);
 double to_spherical(Vec3 const&, double & theta, double & phi);
-Vec3 corrnormal(Vec3 const& n, Vec3 const& o);
 Vec3 reflect(Vec3 const& n, Vec3 const& i);
 
 Vec3 correct_viewup(Vec3 const&, double);
@@ -39,6 +42,7 @@ uint64_t randint();
 uint64_t randint(uint64_t);
 uint64_t randint(uint64_t, uint64_t);
 double rand01();
+std::mt19937_64 & bits_generator();
 
 
 /* deg <=> rad */
@@ -238,8 +242,6 @@ public:
     HitRecord(HitRecord &&) = default;
     HitRecord & operator =(HitRecord const&) = default;
     HitRecord & operator =(HitRecord &&) = default;
-
-    void set_values(Object &, double, Vec3 const& n, Vec2 const&);
 };
 
 

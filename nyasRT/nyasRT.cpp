@@ -22,6 +22,9 @@ using namespace ray_tracers;
 
 Worldp scenes1(uint64_t fig_h, uint64_t fig_w, uint64_t samples, uint32_t depth);
 Worldp scenes2(uint64_t fig_h, uint64_t fig_w, uint64_t samples, uint32_t depth);
+Worldp scenes3(uint64_t fig_h, uint64_t fig_w, uint64_t samples, uint32_t depth);
+Worldp scenes4(uint64_t fig_h, uint64_t fig_w, uint64_t samples, uint32_t depth);
+Worldp scenes5(uint64_t fig_h, uint64_t fig_w, uint64_t samples, uint32_t depth);
 
 
 int main()
@@ -34,8 +37,8 @@ int main()
     Generatorp gen = make_shared<CorrectMJ>();
 
     show_samples(Sampler(Square(), n_sets, n_samples, gen)).save_to(R"(outputs\show_samples\square.png)");
-    show_samples(Sampler(Circle(), n_sets, n_samples, gen)).save_to(R"(outputs\show_samples\circle.png)");
-    show_samples(Sampler(Sphere(), n_sets, n_samples, gen)).save_to(R"(outputs\show_samples\sphere.png)");
+    show_samples(Sampler(sample_types::Circle(), n_sets, n_samples, gen)).save_to(R"(outputs\show_samples\circle.png)");
+    show_samples(Sampler(sample_types::Sphere(), n_sets, n_samples, gen)).save_to(R"(outputs\show_samples\sphere.png)");
     show_samples(Sampler(Hemisphere(10), n_sets, n_samples, gen)).save_to(R"(outputs\show_samples\hemisphere.png)");
 
     show_gen_perform(n_sets, 64, make_shared<Uniform>()).save_to(R"(outputs\show_gen_perform\uniform.png)");
@@ -48,14 +51,14 @@ int main()
     show_gen_perform(n_sets, 64, make_shared<CorrectMJ>()).save_to(R"(outputs\show_gen_perform\correctmj.png)");
 #endif // LOAD_SHOW_SAMPLE_FUNCTIONS
 
-    auto world_p = scenes2(480, 853, 256, 10);
+    auto world_p = scenes5(480, 853, 256, 10);
 
     auto start = system_clock::now();
             render_figure(*world_p, Clamp01());
     auto dura = duration_cast<milliseconds>(system_clock::now() - start);
     cout << "rendering time: " << dura.count() / 1000.f << "s" << endl;
 
-    world_p->camera_p->figure.save_to(R"(outputs/scenes2.png)");
+    world_p->camera_p->figure.save_to(R"(outputs/scenes5.png)");
 
     return 0;
 }
@@ -151,6 +154,90 @@ Worldp scenes2(uint64_t fig_h, uint64_t fig_w, uint64_t samples, uint32_t depth)
 
     auto light2 = make_shared<Point>(75.f * RGB(.6f, .8f, 1.f), Vec3(-5., 0., 4.5));
     world->light_ps.push_back(light2);
+
+    return world;
+}
+
+
+Worldp scenes3(uint64_t fig_h, uint64_t fig_w, uint64_t samples, uint32_t depth) {
+    auto world = make_shared<World>(depth);
+    world->tracer_p = make_shared<RayTracer>(*world);
+
+    auto cam_s = make_sampler(Square(), 83, samples);
+    auto cam_p = Vec3(0, 10, 7);
+    auto look_at = Vec3(0, 0, 1);
+    world->camera_p = make_shared<Pinhole>(fig_h, fig_w, cam_s, cam_p,
+                                           look_at - cam_p, deg2rad(70));
+
+    auto ball_brdf = make_shared<Lambertian>(83, samples);
+    auto ball_mat = make_shared<Opaque>(ball_brdf, RGB(.9f, .5f, .5f));
+    auto ball = make_shared<objects::Sphere>(ball_mat, Vec3(0, 0, 2), 2);
+    world->object_ps.push_back(ball);
+
+    auto floor_brdf = make_shared<Lambertian>(83, samples);
+    auto floor_mat = make_shared<Opaque>(floor_brdf, RGB(.95f));
+    auto floor = make_shared<objects::Sphere>(floor_mat, Vec3(0, 0, -100), 100);
+    world->object_ps.push_back(floor);
+
+    auto light_mat = make_shared<Emissive>(200.f * RGB(1.f, .8f, .6f));
+    auto light = make_shared<objects::Sphere>(light_mat, Vec3(-5., -1., 4.5), .5f);
+    light->sampler_p = make_sampler(sample_types::Sphere(), 83, samples);
+    world->object_ps.push_back(light);
+    world->light_ps.push_back(make_shared<ObjectLight>(light, *world));
+
+    return world;
+}
+
+
+Worldp scenes4(uint64_t fig_h, uint64_t fig_w, uint64_t samples, uint32_t depth) {
+    auto world = make_shared<World>(depth);
+    world->tracer_p = make_shared<RayTracer>(*world);
+
+    auto cam_s = make_sampler(Square(), 83, samples);
+    world->camera_p = make_shared<Pinhole>(fig_h, fig_w, cam_s, Vec3(0, -6, 0),
+                                           Vec3(0, 6, 0), deg2rad(90));
+
+    auto circ_brdf = make_shared<Lambertian>(83, samples);
+    auto circ_mat = make_shared<Opaque>(circ_brdf, RGB(.95f));
+    auto circ1 = make_shared<objects::Circle>(circ_mat, Vec3(-2, 0, 0), Vec3(1, 0, 0), 2);
+    auto circ2 = make_shared<objects::Circle>(circ_mat, Vec3(2, 0, 0), Vec3(1, 0, 0), 2);
+    world->object_ps.push_back(circ1);
+    world->object_ps.push_back(circ2);
+
+    auto light1_mat = make_shared<Emissive>(200.f * RGB(1.f, .8f, .6f));
+    auto light1 = make_shared<objects::Sphere>(light1_mat, Vec3(0), .1f);
+    light1->sampler_p = make_sampler(sample_types::Sphere(), 83, samples);
+    world->object_ps.push_back(light1);
+    world->light_ps.push_back(make_shared<ObjectLight>(light1, *world));
+
+    auto light2_mat = make_shared<Emissive>(200.f * RGB(.6f, .8f, 1.f));
+    auto light2 = make_shared<objects::Sphere>(light2_mat, Vec3(4, 0, 0), .1f);
+    light2->sampler_p = make_sampler(sample_types::Sphere(), 83, samples);
+    world->object_ps.push_back(light2);
+    world->light_ps.push_back(make_shared<ObjectLight>(light2, *world));
+
+    return world;
+}
+
+
+Worldp scenes5(uint64_t fig_h, uint64_t fig_w, uint64_t samples, uint32_t depth) {
+    auto world = make_shared<World>(depth);
+    world->tracer_p = make_shared<RayTracer>(*world);
+
+    auto cam_s = make_sampler(Square(), 83, samples);
+    world->camera_p = make_shared<Pinhole>(fig_h, fig_w, cam_s, Vec3(12, -12, 12),
+                                           Vec3(-12, 12, -12), deg2rad(70));
+
+    auto floor_brdf = make_shared<Lambertian>(83, samples);
+    auto floor_mat = make_shared<Opaque>(floor_brdf, RGB(.95f));
+    auto floor = make_shared<objects::Circle>(floor_mat, Vec3(0), Vec3(0, 0, 1), 100);
+    world->object_ps.push_back(floor);
+
+    auto light_mat = make_shared<Emissive>(100.f * RGB(1.f, .8f, .6f));
+    auto light = make_shared<objects::Circle>(light_mat, Vec3(0, 0, 4), Vec3(1, 0, 0), 1);
+    light->sampler_p = make_sampler(sample_types::Circle(), 83, samples);
+    world->object_ps.push_back(light);
+    world->light_ps.push_back(make_shared<ObjectLight>(light, *world));
 
     return world;
 }

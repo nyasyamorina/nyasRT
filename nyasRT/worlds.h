@@ -46,6 +46,7 @@ public:
 class RayTracer {
 public:
     World & world;
+    remap_colors::MaxTo01 remap;
 
     explicit RayTracer(World &);
 
