@@ -95,6 +95,68 @@ namespace cameras
 
         virtual Ray get_ray(uint64_t h, uint64_t w);
     };
+
+
+    /******************************  Parallel  *******************************/
+
+    class Parallel final : public Camera {
+    public:
+        Vec3 point, direction, u, v;
+
+        explicit Parallel(uint64_t, uint64_t, FigureSamplerp, Vec3 const& p,
+                          Vec3 const& u_, Vec3 const& v_, Vec3 const& d);
+        explicit Parallel(uint64_t, uint64_t, FigureSamplerp, Vec3 const& p,
+                          Vec3 const& d, double wide, Vec3 const& viewup = Vec3(0, 0, 1));
+
+        virtual Ray get_ray(uint64_t h, uint64_t w);
+    };
+
+
+    /********************************  Lens  *********************************/
+
+    class Lens final : public Pinhole {
+    public:
+        typedef Samplerp<sample_types::Circle> LensSamplerp;
+
+        double lens_radius;
+        LensSamplerp len_sampler_p;
+
+        explicit Lens(uint64_t, uint64_t, FigureSamplerp, Vec3 const& p,
+                      Vec3 const& u_, Vec3 const& v_, Vec3 const& d,
+                      double r, LensSamplerp);
+        explicit Lens(uint64_t, uint64_t, FigureSamplerp, Vec3 const& p,
+                      Vec3 const& d, double fov, double r, LensSamplerp,
+                      Vec3 const& viewup = Vec3(0, 0, 1));
+
+        virtual Ray get_ray(uint64_t h, uint64_t w);
+    };
+
+
+    /*******************************  Fisheye  *******************************/
+
+    class Fisheye final : public Camera {
+    public:
+        Vec3 point, direction, u, v;
+        double fov;
+
+        explicit Fisheye(uint64_t, uint64_t, FigureSamplerp, Vec3 const& p,
+                         Vec3 const& d, double fov_, Vec3 const& viewup = Vec3(0, 0, 1));
+
+        virtual Ray get_ray(uint64_t h, uint64_t w);
+    };
+
+
+    /******************************  Spherical  ******************************/
+
+    class Spherical : public Camera {
+    public:
+        Vec3 point, direction, u, v;
+
+        explicit Spherical(uint64_t, uint64_t, FigureSamplerp, Vec3 const& p,
+                           Vec3 const& d, Vec3 const& viewup = Vec3(0, 0, 1));
+
+        virtual Ray get_ray(uint64_t h, uint64_t w);
+    };
 }
 
 

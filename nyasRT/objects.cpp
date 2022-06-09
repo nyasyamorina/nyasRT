@@ -1,14 +1,12 @@
 #include "objects.h"
 #include "worlds.h"
 
-#include "iostream"
-
 using namespace std;
 using namespace materials;
 using namespace sample_types;
 
-constexpr float OneOverPi = 1.0f / 3.141592653589793238462643383279502884f;
 constexpr double Pi = 3.141592653589793238462643383279502884;
+constexpr float OneOverPi = 1.0f / (float)Pi;
 constexpr double FourPi = 4.0 * Pi;
 
 
@@ -241,7 +239,6 @@ bool objects::Sphere::hit_record(HitRecord & rec) {
             return false;
         }
     }
-    /* something similar in `hit` */
     if (t >= rec.t) {
         return false;
     }
