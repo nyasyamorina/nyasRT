@@ -1706,7 +1706,7 @@ template<class T, class U> vec4<std::common_type_t<T, U>> qmul(vec4<T> const& l,
 template<class T, class U> vec4<std::common_type_t<T, U>> rotation(vec3<T> const& rotation_axis, U const& rotate_angle) noexcept
 {
     using R = std::common_type_t<T, U>;
-    return vec4(std::sin(static_cast<R>(rotate_angle) / 2) * normalize(rotation_axis), std::cos(static_cast<R>(rotate_angle) / 2));
+    return vec4(defaults<R>::half * std::sin(static_cast<R>(rotate_angle)) * normalize(rotation_axis), std::cos(defaults<R>::half * static_cast<R>(rotate_angle)));
 }
 template<class T, class U> vec3<std::common_type_t<T, U>> rotate(vec4<T> const& r, vec3<U> const& v) noexcept
 {

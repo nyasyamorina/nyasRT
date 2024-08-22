@@ -18,7 +18,7 @@ class RenderConfig
 {
 public:
 
-    u32 rays_pre_pixel, ray_depth;
+    u32 rays_pre_pixel, max_ray_bounds;
 };
 
 class Renderer
@@ -59,20 +59,19 @@ public:
     : _scence{scence_}, config{0, 0} {}
     Renderer(Scence const& scence_, RenderConfig config_) noexcept
     : _scence{scence_}, config{config_} {}
-    Renderer(Scence const& scence_, u32 rays_pre_pixel, u32 ray_depth) noexcept
-    : _scence{scence_}, config{rays_pre_pixel, ray_depth} {}
+    Renderer(Scence const& scence_, u32 rays_pre_pixel, u32 max_ray_bounds) noexcept
+    : _scence{scence_}, config{rays_pre_pixel, max_ray_bounds} {}
 
     RGB render_pixel(vec2g const& pixel_center, vec2g const& pixel_size) const noexcept
     {
         RGB pixel_color = defaults<RGB>::Black;
 
-        TraceRecord rec;
         for (u32 k = 0; k < config.rays_pre_pixel; k++)
         {
             vec2g position = pixel_center + pixel_size * (random.uniform01<vec2g>() - static_cast<fg>(0.5));
             pixel_color += render_screen(position);
         }
-        return pixel_color.div(config.rays_pre_pixel);
+        return pixel_color.div(config.rays_pre_pixel).apply_gamma();
     }
     RGB render_screen(vec2g const& position) const noexcept
     {
@@ -83,6 +82,9 @@ public:
         {
             object.trace(ray, rec);
         }
+
+        [[maybe_unused]] constexpr RGB tracing_info_scale = RGB(200, 200, 2);
+        //return RGB(rec.box_count, rec.triangle_count, rec.object_p != nullptr) / tracing_info_scale;
 
         RGB normal_color;
         if (rec.object_p != nullptr)
@@ -125,7 +127,7 @@ public:
 
         for (u32 k = 0; k < n_threads; k++)
         {
-            threads.emplace_back([&, this] ()
+            threads.emplace_back([&, this] () noexcept
             {
                 RGB * pixel;
                 u32 col;

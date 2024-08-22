@@ -38,11 +38,13 @@ public:
     Triangle const* triangle_p;
     Mesh const* mesh_p;
     Object3D const* object_p;
+    u32 box_count, triangle_count;
 
     CONST_FUNC TraceRecord() noexcept
     : ray_color{defaults<RGB>::Black}, reflect_color{defaults<RGB>::White}
     , max_ray_time{std::numeric_limits<fg>::max()}, hit_point{defaults<vec3g>::O}, normal{defaults<vec3g>::Z}
-    , hit_local{defaults<vec2g>::O}, triangle_p{nullptr}, mesh_p{nullptr}, object_p{nullptr} {}
+    , hit_local{defaults<vec2g>::O}, triangle_p{nullptr}, mesh_p{nullptr}, object_p{nullptr}
+    , box_count{0}, triangle_count{0} {}
 
     CONST_FUNC TraceRecord & reset() noexcept
     {

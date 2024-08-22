@@ -31,6 +31,16 @@ public:
         return *this;
     }
 
+    CONST_FUNC vec3g size() const noexcept
+    {
+        return max_corner - min_corner;
+    }
+
+    static CONST_FUNC bool intersect(fg time_in, fg time_out, fg max_ray_time) noexcept
+    {
+        return (time_out >= defaults<fg>::eps) && (time_in < max_ray_time) && (time_in < time_out);
+    }
+
     CONST_FUNC std::tuple<fg, fg> trace(Ray const& ray) const noexcept
     {
         vec3g min_time = (min_corner - ray.origin) / ray.direction;
@@ -52,6 +62,6 @@ public:
     CONST_FUNC bool trace(Ray const& ray, TraceRecord const& rec) const noexcept
     {
         auto [time_in, time_out] = trace(ray);
-        return (time_out >= defaults<fg>::eps) && (time_in < rec.max_ray_time) && (time_in < time_out);
+        return intersect(time_in, time_out, rec.max_ray_time);
     }
 };
