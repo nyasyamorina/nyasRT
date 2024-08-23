@@ -1694,39 +1694,25 @@ template<class T, class U> vec4<std::common_type_t<T, U>> reflect(vec4<T> const&
     return v - static_cast<std::common_type_t<T, U>>(2) * dot(v, n) * n;
 }
 
+template<class T> vec4<T> qconj(vec4<T> const& v) noexcept
+{
+    return vec4(-v.xyz(), v.w);
+}
 template<class T, class U> vec4<std::common_type_t<T, U>> qmul(vec4<T> const& l, vec4<U> const& r) noexcept
 {
-    return vec4(
-        l.w * r.w - l.x * r.x - l.y * r.y - l.z * r.z,
-        l.w * r.x + l.x * r.w + l.y * r.z - l.z * r.y,
-        l.w * r.y - l.x * r.z + l.y * r.w + l.z * r.x,
-        l.w * r.z + l.x * r.y - l.y * r.x + l.z * r.w
-    );
-}
-template<class T, class U> vec4<std::common_type_t<T, U>> rotation(vec3<T> const& rotation_axis, U const& rotate_angle) noexcept
-{
-    using R = std::common_type_t<T, U>;
-    return vec4(defaults<R>::half * std::sin(static_cast<R>(rotate_angle)) * normalize(rotation_axis), std::cos(defaults<R>::half * static_cast<R>(rotate_angle)));
-}
-template<class T, class U> vec3<std::common_type_t<T, U>> rotate(vec4<T> const& r, vec3<U> const& v) noexcept
-{
-    T xx = r.x*r.x, yy = r.y*r.y, zz = r.z*r.z, ww = r.w*r.w;
-    T xy = r.x*r.y, xz = r.x*r.z, xw = r.x*r.w;
-    T yz = r.y*r.z, yw = r.y*r.w;
-    T zw = r.z*r.w;
-    return vec3(
-        v.x * (yy + zz - xx - ww) + v.y * (2 * (zw - xy)) + v.z * (2 * (-yw - xz)),
-        v.x * (2 * (-zw - xy)) + v.y * (xx - yy + zz - ww) + v.z * (2 * (xw - yz)),
-        v.x * (2 * (yw - xz)) + v.y * (2 * (-xw - yz)) + v.z * (xx + yy - zz - ww)
-    );
+    return vec4(l.w * r.xyz() + r.w * l.xyz() + cross(l.xyz(), r.xyz()), l.w * r.w - dot(l.xyz(), r.xyz()));
 }
 
+
 /******** numerical operations ********/
-// TODO: compare each elements and return a vector of booleans
 
 template<class T> CONST_FUNC T sum(vec4<T> const& v) noexcept
 {
     return v.x + v.y + v.z + v.w;
+}
+template<class T> CONST_FUNC T prod(vec4<T> const& v) noexcept
+{
+    return v.x * v.y * v.z * v.w;
 }
 
 template<class T> CONST_FUNC vec4<T> operator + (vec4<T> const& v) noexcept
@@ -1880,4 +1866,29 @@ template<class T, class U> CONST_FUNC vec4<std::common_type_t<T, U>> operator <<
 template<class T, class U> CONST_FUNC vec4<std::common_type_t<T, U>> operator >>(vec4<T> const& v1, vec4<U> const& v2) noexcept
 {
     return vec4(v1.x >> v2.x, v1.y >> v2.y, v1.z >> v2.z, v1.w >> v2.w);
+}
+
+template<class T> CONST_FUNC vec4<T> min(vec4<T> const& v, T const& s) noexcept
+{
+    return vec4(std::min(v.x, s), std::min(v.y, s), std::min(v.z, s), std::min(v.w, s));
+}
+template<class T> CONST_FUNC vec4<T> max(vec4<T> const& v, T const& s) noexcept
+{
+    return vec4(std::max(v.x, s), std::max(v.y, s), std::max(v.z, s), std::max(v.w, s));
+}
+template<class T> CONST_FUNC vec4<T> min(T const& s, vec4<T> const& v) noexcept
+{
+    return vec4(std::min(s, v.x), std::min(s. v.y), std::min(s. v.z), std::min(s. v.w));
+}
+template<class T> CONST_FUNC vec4<T> max(T const& s, vec4<T> const& v) noexcept
+{
+    return vec4(std::max(s, v.x), std::max(s, v.y), std::max(s, v.z), std::max(s, v.w));
+}
+template<class T> CONST_FUNC vec4<T> min(vec4<T> const& v1, vec4<T> const& v2) noexcept
+{
+    return vec4(std::min(v1.x, v2.x), std::min(v1.y, v2.y), std::min(v1.z, v2.z), std::min(v1.w, v2.w));
+}
+template<class T> CONST_FUNC vec4<T> max(vec4<T> const& v1, vec4<T> const& v2) noexcept
+{
+    return vec4(std::max(v1.x, v2.x), std::max(v1.y, v2.y), std::max(v1.z, v2.z), std::max(v1.w, v2.w));
 }

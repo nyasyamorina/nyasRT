@@ -18,6 +18,26 @@ public:
     CONST_FUNC BoundingBox() noexcept
     : min_corner{defaults<vec3g>::max}, max_corner{defaults<vec3g>::min} {}
 
+    CONST_FUNC bool prepare() noexcept
+    {
+        vec3<bool> thin_layer = (max_corner / min_corner).isleq(defaults<fg>::eps);
+        if (thin_layer.x)
+        {
+            min_corner.x *= 1 - defaults<fg>::eps;
+            max_corner.x *= 1 + defaults<fg>::eps;
+        }
+        if (thin_layer.y)
+        {
+            min_corner.y *= 1 - defaults<fg>::eps;
+            max_corner.y *= 1 + defaults<fg>::eps;
+        }
+        if (thin_layer.z)
+        {
+            min_corner.z *= 1 - defaults<fg>::eps;
+            max_corner.z *= 1 + defaults<fg>::eps;
+        }
+        return true;
+    }
     CONST_FUNC BoundingBox & reset() noexcept
     {
         min_corner = defaults<vec3g>::max;
@@ -26,8 +46,8 @@ public:
     }
     CONST_FUNC BoundingBox & bound(vec3g const& point) noexcept
     {
-        min_corner.x = std::min(min_corner.x, point.x); min_corner.y = std::min(min_corner.y, point.y); min_corner.z = std::min(min_corner.z, point.z);
-        max_corner.x = std::max(max_corner.x, point.x); max_corner.y = std::max(max_corner.y, point.y); max_corner.z = std::max(max_corner.z, point.z);
+        min_corner = min(min_corner, point);
+        max_corner = max(max_corner, point);
         return *this;
     }
 

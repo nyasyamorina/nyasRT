@@ -1,21 +1,7 @@
 #include <iostream>
 #include <string>
 
-#include "utils.hpp"
-#include "geometry/vec2.hpp"
-#include "geometry/vec3.hpp"
-#include "geometry/vec4.hpp"
-#include "RGB.hpp"
-#include "geometry/Ray.hpp"
-#include "geometry/BoundingBox.hpp"
-#include "geometry/Mesh.hpp"
-#include "Object3D.hpp"
-#include "cameras/Camera.hpp"
-#include "cameras/PerspectiveCamera.hpp"
-#include "Figure.hpp"
-#include "random.hpp"
-#include "Scence.hpp"
-#include "Renderer.hpp"
+#include "nyasRT.hpp"
 
 
 template<class FP> std::string fp_name() noexcept;
@@ -30,13 +16,11 @@ template<> std::string fp_name<f64>() noexcept
 
 
 #ifdef NDEBUG
-constexpr u32 figure_height = 720;
-constexpr u32 figure_width  = 1280;
+constexpr vec2<u32> figure_size  = vec2(1280, 720);
 constexpr u32 rays_per_pixel = 20;
 constexpr u32 max_ray_bounds = 10;
 #else
-constexpr u32 figure_height = 360;
-constexpr u32 figure_width  = 640;
+constexpr vec2<u32> figure_size  = vec2(640, 360);
 constexpr u32 rays_per_pixel = 2;
 constexpr u32 max_ray_bounds = 3;
 #endif
@@ -46,19 +30,19 @@ using namespace std::chrono;
 i32 main(i32, char * *)
 {
     std::cout << " -- using " << fp_name<fg>() << " to calculate geometry operations" << std::endl;
-    std::cout << " -- render config: figure size " << figure_width << 'x' << figure_height << ", "
+    std::cout << " -- render config: figure size " << figure_size.x << 'x' << figure_size.y << ", "
     << rays_per_pixel << " rays/pixel, ray depth " << max_ray_bounds << std::endl;
 
 
-    Figure fig(figure_height, figure_width);
+    Figure fig(figure_size);
 
     Scence scence;
 
     MeshPtr mesh_p = Mesh::load_obj("../../models/teapot.obj");
     scence.objects.emplace_back(mesh_p);
-    scence.objects.back().transform.rotate(defaults<vec3g>::Z, deg2rad(135.0)).scale(0.8).offset(vec3g(-2, -0.5, 0));
+    scence.objects.back().transform.rotate(defaults<vec3g>::Z, deg2rad(135.0)).scale(0.8).shift(vec3g(-2, -0.5, 0));
     scence.objects.emplace_back(mesh_p);
-    scence.objects.back().transform.rotate(defaults<vec3g>::X, deg2rad(-90.0)).rotate(defaults<vec3g>::Z, deg2rad(-45.0)).scale(0.8).offset(vec3g(0, -4.3, 1.3));
+    scence.objects.back().transform.rotate(defaults<vec3g>::X, deg2rad(-90.0)).rotate(defaults<vec3g>::Z, deg2rad(-45.0)).scale(0.8).shift(vec3g(0, -4.3, 1.3));
 
     auto camera_p = std::make_shared<PerspectiveCamera>();
     camera_p->set_view_origin(vec3g(8, 10, 9.5)).set_view_direction(-vec3g(8, 10, 7.5)).set_aspect_ratio(fig.aspect_ratio()).set_field_of_view(deg2rad(45.0));
@@ -88,6 +72,8 @@ i32 main(i32, char * *)
     auto total_time_16 = system_clock::now() - start_16;
     auto total_sec_16 = static_cast<f32>(duration_cast<microseconds>(total_time_16).count()) / 1000000.0f;
     std::cout << "16-thread rendering time: " << total_sec_16 << "s" << std::endl;
+
+    for (RGB & pixel : fig) { pixel.apply_gamma(); }
     fig.save<QOI>("../../out_16.qoi");
     //fig.save<QOI>("../../out_trace_info.qoi");
 }

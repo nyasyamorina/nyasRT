@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <math.h>
 #include <memory>
+#include <numeric>
 #include <queue>
 #include <stack>
 #include <string>
@@ -100,6 +101,7 @@ public:
                 box.bound(vertices[face_p->y]);
                 box.bound(vertices[face_p->z]);
             }
+            box.prepare();
         }
 
         CONST_FUNC bool isleaf() const noexcept
@@ -127,7 +129,7 @@ public:
 
 
     static constexpr u32 max_triangles_per_box = 3;
-    // max_boxes_depth ?
+    static constexpr u32 max_boxes_depth = 32;
     static constexpr u32 max_strategy_iterations = 32;
 
     enum class DividingStrategy { X, Y, Z };
@@ -143,157 +145,146 @@ public:
         }
 
         // Boxes Queue
-        std::queue<BoxNode> unprocessed_boxes;
+        std::queue<std::tuple<u32/*depth*/, BoxNode>> unprocessed_boxes;
         // global box
-        unprocessed_boxes.emplace(vertices, faces, 0, faces.size());
+        unprocessed_boxes.emplace(1, BoxNode(vertices, faces, 0, faces.size()));
 
-        u32 processed_count = 0;
+        u32 box_count = 1;
         while (!unprocessed_boxes.empty())
         {
-            BoxNode & box_node = unprocessed_boxes.front();
+            auto [box_depth, box_node] = unprocessed_boxes.front();
 
             // if this box have so much triangles, then divide it in half
-            static_assert(max_triangles_per_box > 0);
-            if (u32 n_faces = box_node.triangles_length(); n_faces > max_triangles_per_box)
+            if ((box_node.triangles_length() > max_triangles_per_box) && (box_depth < max_boxes_depth))
             {
-                u32 face_stop = box_node.triangle_start() + n_faces;
+                u32 face_stop = box_node.triangle_start() + box_node.triangles_length();
                 vec3g box_size = box_node.box.size();
 
-                // find the divide strategy on each axes so that each halves have almost the same area.
+                // find the best divide strategy on each axes so that each halves have almost the same area.
 
-                fg xla = 0, xra = 1;
-                fg line_x = box_node.box.min_corner.x;
+                // divide on x-axis
+                DividingStrategy strategy = DividingStrategy::X;
+                fg left_area = 0, right_area = 1;
+                fg divide_line = box_node.box.min_corner.x;
                 for (u32 iter = 0; iter < max_strategy_iterations; iter++)
                 {
                     // set a new dividing line
                     fg min_distance = std::numeric_limits<fg>::max(), delta = box_size.x / (1 << (iter + 1));
-                    line_x += delta * (xla > xra ? -1 : 1);
+                    divide_line += delta * (left_area > right_area ? -1 : 1);
                     // calculate how many area in each side
-                    xla = xra = 0;
+                    left_area = right_area = 0;
                     for (u32 index = box_node.triangle_start(); index < face_stop; index++)
                     {
                         std::tuple<vec3g, fg> const& info = trian_infos[index];
-                        fg tmp = std::get<0>(info).x - line_x;
+                        fg tmp = std::get<0>(info).x - divide_line;
                         min_distance = std::min(min_distance, std::abs(tmp));
-                        if (tmp <= 0) { xla += std::get<1>(info); }
-                        else { xra += std::get<1>(info); }
+                        if (tmp <= 0) { left_area += std::get<1>(info); }
+                        else { right_area += std::get<1>(info); }
                     }
-                    if (min_distance > delta) { break; }
+                    if (min_distance > delta) { break; } // even the nearest triangle is too far to reach
                 }
 
-                fg yla = 0, yra = 1;
-                fg line_y = box_node.box.min_corner.y;
+                // divide on y-axis
+                fg l_a = 0, r_a = 1;
+                fg d_l = box_node.box.min_corner.y;
                 for (u32 iter = 0; iter < max_strategy_iterations; iter++)
                 {
                     // set a new dividing line
                     fg min_distance = std::numeric_limits<fg>::max(), delta = box_size.y / (1 << (iter + 1));
-                    line_y += delta * (yla > yra ? -1 : 1);
+                    d_l += delta * (l_a > r_a ? -1 : 1);
                     // calculate how many area in each side
-                    yla = yra = 0;
+                    l_a = r_a = 0;
                     for (u32 index = box_node.triangle_start(); index < face_stop; index++)
                     {
                         std::tuple<vec3g, fg> const& info = trian_infos[index];
-                        fg tmp = std::get<0>(info).y - line_y;
+                        fg tmp = std::get<0>(info).y - d_l;
                         min_distance = std::min(min_distance, std::abs(tmp));
-                        if (tmp <= 0) { yla += std::get<1>(info); }
-                        else { yra += std::get<1>(info); }
+                        if (tmp <= 0) { l_a += std::get<1>(info); }
+                        else { r_a += std::get<1>(info); }
                     }
-                    if (min_distance > delta) { break; }
+                    if (min_distance > delta) { break; } // even the nearest triangle is too far to reach
+                }
+                // replace the strategy if the divide on y-axis is better than on x-aixs
+                if (std::abs(l_a - r_a) < std::abs(left_area - right_area))
+                {
+                    strategy = DividingStrategy::Y;
+                    divide_line = d_l;
+                    left_area = l_a; right_area = r_a;
                 }
 
-                fg zla = 0, zra = 1;
-                fg line_z = box_node.box.min_corner.z;
+                // divide on z-axis
+                l_a = 0; r_a = 1;
+                d_l = box_node.box.min_corner.z;
                 for (u32 iter = 0; iter < max_strategy_iterations; iter++)
                 {
                     // set a new dividing line
                     fg min_distance = std::numeric_limits<fg>::max(), delta = box_size.z / (1 << (iter + 1));
-                    line_z += delta * (zla > zra ? -1 : 1);
+                    d_l += delta * (l_a > r_a ? -1 : 1);
                     // calculate how many area in each side
-                    zla = zra = 0;
+                    l_a = r_a = 0;
                     for (u32 index = box_node.triangle_start(); index < face_stop; index++)
                     {
                         std::tuple<vec3g, fg> const& info = trian_infos[index];
-                        fg tmp = std::get<0>(info).z - line_z;
+                        fg tmp = std::get<0>(info).z - d_l;
                         min_distance = std::min(min_distance, std::abs(tmp));
-                        if (tmp <= 0) { zla += std::get<1>(info); }
-                        else { zra += std::get<1>(info); }
+                        if (tmp <= 0) { l_a += std::get<1>(info); }
+                        else { r_a += std::get<1>(info); }
                     }
-                    if (min_distance > delta) { break; }
+                    if (min_distance > delta) { break; } // even the nearest triangle is too far to reach
                 }
-
-                // compare each strategies and choose the best one
-
-                DividingStrategy strategy = DividingStrategy::X;
-                fg divide_line = line_x;
-                fg left_area = xla, right_area = xra;
-                if (std::abs(yla - yra) < std::abs(left_area - right_area))
-                {
-                    strategy = DividingStrategy::Y;
-                    divide_line = line_y;
-                    left_area = yla; right_area = yra;
-                }
-                if (std::abs(zla - zra) < std::abs(left_area - right_area))
+                // replace the strategy if the divide on z-axis is better than above
+                if (std::abs(l_a - r_a) < std::abs(left_area - right_area))
                 {
                     strategy = DividingStrategy::Z;
-                    divide_line = line_z;
-                    left_area = zla; right_area = zra;
+                    divide_line = d_l;
+                    left_area = l_a; right_area = r_a;
                 }
 
-                auto strategy_axis = [strategy] (vec3g const& center) noexcept -> fg
+                // divide this box in halves if the divide strategy success
+                if ((left_area > defaults<fg>::eps) && (right_area > defaults<fg>::eps))
                 {
-                    switch (strategy)
+                    auto strategy_axis = [strategy] (vec3g const& center) noexcept -> fg
                     {
-                        case DividingStrategy::X:
-                            return center.x;
-                        case DividingStrategy::Y:
-                            return center.y;
-                        case DividingStrategy::Z:
-                            return center.z;
-                    }
-                };
+                        switch (strategy)
+                        {
+                            case DividingStrategy::X:
+                                return center.x;
+                            case DividingStrategy::Y:
+                                return center.y;
+                            case DividingStrategy::Z:
+                                return center.z;
+                        }
+                    };
 
-                // swap triangles to left part and right part
-
-                u32 face_start = box_node.triangle_start();
-                u32 index_right_start = -1;
-                for (u32 index = face_start + 1; index < face_stop; index++)
-                {
-                    if ((strategy_axis(std::get<0>(trian_infos[index])) <= divide_line) && (index_right_start != -1))
+                    constexpr u32 invalid_index = std::numeric_limits<u32>::max();
+                    // swap triangles to left part and right part
+                    u32 face_start = box_node.triangle_start();
+                    u32 index_right_start = invalid_index;
+                    for (u32 index = face_start + 1; index < face_stop; index++)
                     {
-                        std::swap(      faces[index_right_start],       faces[index]);
-                        std::swap( _triangles[index_right_start],  _triangles[index]);
-                        std::swap(trian_infos[index_right_start], trian_infos[index]);
-                        index_right_start++;
+                        if ((index_right_start != invalid_index) && (strategy_axis(std::get<0>(trian_infos[index])) <= divide_line))
+                        {
+                            std::swap(      faces[index_right_start],       faces[index]);
+                            std::swap( _triangles[index_right_start],  _triangles[index]);
+                            std::swap(trian_infos[index_right_start], trian_infos[index]);
+                            index_right_start++;
+                        }
+                        else if (index_right_start == invalid_index)
+                        {
+                            index_right_start = index;
+                        }
                     }
-                    else if (index_right_start == -1)
-                    {
-                        index_right_start = index;
-                    }
-                }
 
-                if ((index_right_start == face_start) || (index_right_start == face_stop) || (index_right_start == -1))
-                {
-                    std::cout << "count " << processed_count << " (" << face_start << '|' << index_right_start
-                        << '|' << face_stop << ')' << std::endl;
-                    std::cout << "box: [" << box_node.box.min_corner.x << ' ' << box_node.box.min_corner.y << ' ' << box_node.box.min_corner.z
-                              << "] - ["  << box_node.box.max_corner.x << ' ' << box_node.box.max_corner.y << ' ' << box_node.box.max_corner.z << ']' << std::endl;
-                    std::cout << "strategy: " << divide_line << " on " << (strategy == DividingStrategy::X ? 'X' : (strategy == DividingStrategy::Y ? 'Y' : 'Z'))
-                    << "-axis, with area (" << left_area << '|' << right_area << ')' << std::endl;
-                }
-                else
-                {
-                    // create left leaf child box
-                    unprocessed_boxes.emplace(vertices, faces, face_start, index_right_start - face_start);
-                    box_node.index_l = processed_count - 1 + unprocessed_boxes.size();
-
-                    // create right leaf child box
-                    unprocessed_boxes.emplace(vertices, faces, index_right_start, face_stop - index_right_start);
-                    box_node.index_r = processed_count - 1 + unprocessed_boxes.size();
+                    // contruct child-boxes
+                    unprocessed_boxes.emplace(box_depth + 1, BoxNode(vertices, faces, face_start, index_right_start - face_start));
+                    box_node.index_l = box_count++;
+                    unprocessed_boxes.emplace(box_depth + 1, BoxNode(vertices, faces, index_right_start, face_stop - index_right_start));
+                    box_node.index_r = box_count++;
                 }
             }
 
-            _boxes.push_back(box_node); unprocessed_boxes.pop();
-            processed_count++;
+            _boxes.push_back(box_node);
+            unprocessed_boxes.pop();
         }
     }
 

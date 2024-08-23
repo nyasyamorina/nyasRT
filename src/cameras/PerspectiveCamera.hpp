@@ -24,7 +24,8 @@ public:
 
     virtual Ray cast_ray(vec2g const& screen_position) const noexcept override
     {
-        return Ray(_view.origin, _view.direction + screen_position.x * _horizontal + screen_position.y * _vertical);
+        vec3g direction = _view.direction + screen_position.x * _horizontal + screen_position.y * _vertical;
+        return Ray(_view.origin, direction.normalize());
     }
 
 

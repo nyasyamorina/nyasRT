@@ -357,6 +357,10 @@ template<class T> CONST_FUNC T sum(vec2<T> const& v) noexcept
 {
     return v.x + v.y;
 }
+template<class T> CONST_FUNC T prod(vec2<T> const& v) noexcept
+{
+    return v.x * v.y;
+}
 
 template<class T> CONST_FUNC vec2<T> operator + (vec2<T> const& v) noexcept
 {
@@ -509,4 +513,29 @@ template<class T, class U> CONST_FUNC vec2<std::common_type_t<T, U>> operator <<
 template<class T, class U> CONST_FUNC vec2<std::common_type_t<T, U>> operator >>(vec2<T> const& v1, vec2<U> const& v2) noexcept
 {
     return vec2(v1.x >> v2.x, v1.y >> v2.y);
+}
+
+template<class T> CONST_FUNC vec2<T> min(vec2<T> const& v, T const& s) noexcept
+{
+    return vec2(std::min(v.x, s), std::min(v.y, s));
+}
+template<class T> CONST_FUNC vec2<T> max(vec2<T> const& v, T const& s) noexcept
+{
+    return vec2(std::max(v.x, s), std::max(v.y, s));
+}
+template<class T> CONST_FUNC vec2<T> min(T const& s, vec2<T> const& v) noexcept
+{
+    return vec2(std::min(s, v.x), std::min(s. v.y));
+}
+template<class T> CONST_FUNC vec2<T> max(T const& s, vec2<T> const& v) noexcept
+{
+    return vec2(std::max(s, v.x), std::max(s, v.y));
+}
+template<class T> CONST_FUNC vec2<T> min(vec2<T> const& v1, vec2<T> const& v2) noexcept
+{
+    return vec2(std::min(v1.x, v2.x), std::min(v1.y, v2.y));
+}
+template<class T> CONST_FUNC vec2<T> max(vec2<T> const& v1, vec2<T> const& v2) noexcept
+{
+    return vec2(std::max(v1.x, v2.x), std::max(v1.y, v2.y));
 }

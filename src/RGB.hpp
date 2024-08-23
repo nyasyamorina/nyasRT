@@ -31,8 +31,6 @@ CONST_FUNC f32 remove_gamma(f32 x) noexcept
 }
 
 
-template<class T> class vec3;
-
 class RGB final
 {
 public:
@@ -208,6 +206,11 @@ CONST_FUNC RGB remove_gamma(RGB const& c) noexcept
     return RGB(remove_gamma(c.r), remove_gamma(c.g), remove_gamma(c.b));
 }
 
+CONST_FUNC f32 brightness(RGB const& c) noexcept
+{
+    return 0.2126f * c.r + 0.7152f * c.g + 0.0722f * c.b;
+}
+
 
 /******** inplace numerical operations ********/
 
@@ -261,3 +264,37 @@ CONST_FUNC RGB operator / (RGB const& c1, RGB const& c2) noexcept
 {
     return RGB(c1.r / c2.r, c1.g / c2.g, c1.b / c2.b);
 }
+
+
+/******** 3x8 bit RGB value ********/
+
+class RGB24
+{
+public:
+
+    u8 r, g, b;
+
+    CONST_FUNC RGB24() noexcept
+    : RGB24(defaults<RGB>::Black) {}
+    CONST_FUNC RGB24(u8 r_, u8 g_, u8 b_) noexcept
+    : r{r_}, g{g_}, b{b_} {}
+    CONST_FUNC RGB24(RGB const& c) noexcept
+    : r(clamp01(c.r) * 255.0f + 0.5f), g(clamp01(c.g) * 255.0f + 0.5f), b(clamp01(c.b) * 255.0f + 0.5f) {}
+
+    CONST_FUNC RGB24 & operator = (RGB const& c) noexcept
+    {
+        r = clamp01(c.r) * 255.0f + 0.5f;
+        g = clamp01(c.g) * 255.0f + 0.5f;
+        b = clamp01(c.b) * 255.0f + 0.5f;
+        return *this;
+    }
+
+    CONST_FUNC bool operator == (RGB24 const& c) const noexcept
+    {
+        return (r == c.r) && (g == c.g) && (b == c.b);
+    }
+    CONST_FUNC bool operator == (RGB const& c) const noexcept
+    {
+        return (*this) == RGB24(c);
+    }
+};

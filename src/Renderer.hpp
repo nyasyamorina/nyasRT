@@ -1,5 +1,7 @@
 #pragma once
 
+#include <algorithm>
+#include <math.h>
 #include <mutex>
 #include <thread>
 #include <vector>
@@ -25,29 +27,65 @@ class Renderer
 {
 protected:
 
-    class PixelCounter
+    static constexpr vec2<u32> task_size = vec2(16, 16);
+
+    class TasksManager final
     {
+    private:
+
+        vec2<i32> * tasks;
+        vec2<i32> * next_task;
+        vec2<i32> * tasks_stop;
+
     public:
 
-        u32 row, col, width;
+        TasksManager(Figure & fig)
+        : tasks{nullptr}, next_task{nullptr}, tasks_stop{nullptr} {
+            vec2<i32> center = fig.size() >> 1;
+            vec2<i32> start_start = center % task_size;
+            if (start_start.x > 0) { start_start.x -= task_size.x; }
+            if (start_start.y > 0) { start_start.y -= task_size.y; }
 
-        PixelCounter(Figure const& fig) noexcept
-        : row(0), col(0), width(fig.width()) {}
+            u32 total_tasks = prod((fig.size() - 1 - start_start) / task_size + 1);
+            tasks = next_task = new vec2<i32>[total_tasks];
+            tasks_stop = tasks + total_tasks;
 
-        PixelCounter & operator ++ () noexcept
-        {
-            if ((++row) >= width)
+            for (i64 start_y = start_start.y; start_y < fig.height(); start_y += task_size.y)
             {
-                row = 0;
-                col++;
+                for (i64 start_x = start_start.x; start_x < fig.width(); start_x += task_size.x)
+                {
+                    *(next_task++) = vec2<i32>(start_x, start_y);
+                }
             }
-            return *this;
+            next_task = tasks;
+
+            std::sort(tasks, tasks_stop, [center] (vec2<i32> l, vec2<i32> r) noexcept -> bool
+            {
+                l += task_size / 2; r += task_size / 2;
+                i32 ld = (l.x < center.x) ? (center.x - l.x) : (l.x - center.x);
+                ld += (l.y < center.y) ? (center.y - l.y) : (l.y - center.y);
+                i32 rd = (r.x < center.x) ? (center.x - r.x) : (r.x - center.x);
+                rd += (r.y < center.y) ? (center.y - r.y) : (r.y - center.y);
+                return ld < rd;
+            });
         }
-        PixelCounter & operator ++ (i32) noexcept
+
+        ~TasksManager() noexcept
         {
-            return ++(*this);
+            delete[] tasks;
+        }
+
+        bool empty() const noexcept
+        {
+            return next_task >= tasks_stop;
+        }
+
+        vec2<i32> take() noexcept
+        {
+            return *(next_task++);
         }
     };
+
 
     Scence const& _scence;
 
@@ -71,7 +109,7 @@ public:
             vec2g position = pixel_center + pixel_size * (random.uniform01<vec2g>() - static_cast<fg>(0.5));
             pixel_color += render_screen(position);
         }
-        return pixel_color.div(config.rays_pre_pixel).apply_gamma();
+        return pixel_color.div(config.rays_pre_pixel);
     }
     RGB render_screen(vec2g const& position) const noexcept
     {
@@ -103,14 +141,13 @@ public:
         if (!_scence.prepared()) { return; }
 
         vec2g pixel_size = fig.pixel_size();
-        PixelCounter counter(fig);
+        ViewedFigure view(fig);
 
-        for (RGB & pixel : fig)
+        auto stop = view.end();
+        for (auto pixel = view.begin(); pixel < stop; pixel++)
         {
-            vec2g center = fig.screen_position(counter.row, counter.col);
-            pixel = render_pixel(center, pixel_size);
-
-            counter++;
+            vec2g center = fig.screen_position(pixel.index);
+            *pixel = render_pixel(center, pixel_size);
         }
     }
     void render(Figure & fig, u32 n_threads) const
@@ -121,33 +158,31 @@ public:
         threads.reserve(n_threads);
 
         vec2g pixel_size = fig.pixel_size();
-        RGB * global_pixel = fig.begin();
-        u32 golbal_col = 0;
-        std::mutex request_pixel;
+        TasksManager manager(fig);
+        std::mutex request_task;
 
         for (u32 k = 0; k < n_threads; k++)
         {
             threads.emplace_back([&, this] () noexcept
             {
-                RGB * pixel;
-                u32 col;
+                vec2<i32> task_start;
+                ViewedFigure view(fig);
 
                 while (true)
                 {
-                    /* requesting pixels */ {
-                        std::lock_guard<std::mutex> lock(request_pixel);
+                    /* requesting task */ {
+                        std::lock_guard<std::mutex> lock(request_task);
+                        if (manager.empty()) { break; }
 
-                        if (!(golbal_col < fig.height())) { break; }
-
-                        col = golbal_col++;
-                        pixel = global_pixel;
-                        global_pixel += fig.width();
+                        task_start = manager.take();
                     }
+                    view.set_start(task_start, task_size);
 
-                    for (u32 row = 0; row < fig.width(); row++)
+                    auto stop = view.end();
+                    for (auto pixel = view.begin(); pixel < stop; pixel++)
                     {
-                        vec2g center = fig.screen_position(row, col);
-                        *(pixel++) = render_pixel(center, pixel_size);
+                        vec2g center = fig.screen_position(pixel.index);
+                        *pixel = render_pixel(center, pixel_size);
                     }
                 }
             });

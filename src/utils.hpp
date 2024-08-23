@@ -27,6 +27,14 @@ using f64 = double;
 using fg = f32;
 
 
+/********** numerical functions **********/
+
+template<class T> CONST_FUNC T sqr(T const& x) noexcept
+{
+    return x * x;
+}
+
+
 /********** default values **********/
 
 template<class T> class defaults;
@@ -35,19 +43,21 @@ template<> class defaults<f32>
 {
 public:
 
-    static constexpr f32 half  = 0.5f;
-    static constexpr f32 third = 1.0f / 3.0f;
-    static constexpr f32 pi    = 3.1415927f;
-    static constexpr f32 eps   = 1e-5f;
+    static constexpr f32 half   = 0.5f;
+    static constexpr f32 third  = 1.0f / 3.0f;
+    static constexpr f32 pi     = 3.1415927f;
+    static constexpr f32 inv_pi = 1.0f / pi;
+    static constexpr f32 eps    = 1e-5f;
 };
 template<> class defaults<f64>
 {
 public:
 
-    static constexpr f64 half  = 0.5;
-    static constexpr f64 third = 1.0 / 3.0;
-    static constexpr f64 pi    = 3.141592653589793;
-    static constexpr f64 eps   = 1e-8;
+    static constexpr f64 half   = 0.5;
+    static constexpr f64 third  = 1.0 / 3.0;
+    static constexpr f64 pi     = 3.141592653589793;
+    static constexpr f64 inv_pi = 1.0 / pi;
+    static constexpr f64 eps    = 1e-8;
 };
 
 
