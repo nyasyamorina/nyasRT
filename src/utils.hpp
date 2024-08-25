@@ -30,9 +30,18 @@ using fg = f32;
 
 /********** numerical functions **********/
 
+template<class X, class Y, class A> CONST_FUNC auto mix(X const& x, Y const& y, A const& a) noexcept
+{
+    return x + (y - x) * a;
+}
+
 template<class T> CONST_FUNC T sqr(T const& x) noexcept
 {
     return x * x;
+}
+template<class T> CONST_FUNC T pow5(T const& x) noexcept
+{
+    return sqr(sqr(x)) * x;
 }
 
 
@@ -47,6 +56,7 @@ public:
     static constexpr f32 half   = 0.5f;
     static constexpr f32 third  = 1.0f / 3.0f;
     static constexpr f32 pi     = 3.1415927f;
+    static constexpr f32 two_pi = 2.0f * pi;
     static constexpr f32 inv_pi = 1.0f / pi;
     static constexpr f32 eps    = 1e-5f;
 };
@@ -57,6 +67,7 @@ public:
     static constexpr f64 half   = 0.5;
     static constexpr f64 third  = 1.0 / 3.0;
     static constexpr f64 pi     = 3.141592653589793;
+    static constexpr f64 two_pi = 2.0 * pi;
     static constexpr f64 inv_pi = 1.0 / pi;
     static constexpr f64 eps    = 1e-8;
 };

@@ -5,8 +5,6 @@
 #include <math.h>
 #include <memory>
 #include <numeric>
-#include <queue>
-#include <stack>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -56,6 +54,9 @@ public:
 
     bool trace(Ray const& ray, TraceRecord & rec) const noexcept
     {
+        // triangle cannot be seen from behind, may be deprecated this line
+        if (dot(ray.direction, normal) >= 0) { return false; }
+
         fg hit_time = dot(vertex - ray.origin, normal) / dot(ray.direction, normal);
         if ((hit_time < defaults<fg>::eps) || (hit_time >= rec.max_ray_time)) { return false; }
 
@@ -69,7 +70,6 @@ public:
         rec.hit_point = hit_point;
         rec.normal = normal;
         rec.hit_local = vec2g(contra_u, contra_v);
-        rec.triangle_p = this;
         return true;
     }
 };
@@ -130,7 +130,7 @@ public:
 
     static constexpr u32 max_triangles_per_box = 3;
     static constexpr u32 max_boxes_depth = 32;
-    static constexpr u32 max_strategy_iterations = 32;
+    static constexpr u32 max_strategy_iterations = 16;
 
     enum class DividingStrategy { X, Y, Z };
 
@@ -144,20 +144,22 @@ public:
             trian_infos.emplace_back(triangle.center(), triangle.area());
         }
 
-        // Boxes Queue
-        std::queue<std::tuple<u32/*depth*/, BoxNode>> unprocessed_boxes;
+        _boxes.clear();
+        std::vector<u32> boxes_depth;
         // global box
-        unprocessed_boxes.emplace(1, BoxNode(vertices, faces, 0, faces.size()));
+        _boxes.emplace_back(vertices, faces, 0, faces.size());
+        boxes_depth.emplace_back(1);
 
-        u32 box_count = 1;
-        while (!unprocessed_boxes.empty())
+        u32 box_index = 0, box_count = 1;
+        for (; box_index < box_count; box_index++)
         {
-            auto [box_depth, box_node] = unprocessed_boxes.front();
-
+            BoxNode & box_node = _boxes[box_index];
+            u32 box_depth = boxes_depth[box_index];
             // if this box have so much triangles, then divide it in half
             if ((box_node.triangles_length() > max_triangles_per_box) && (box_depth < max_boxes_depth))
             {
-                u32 face_stop = box_node.triangle_start() + box_node.triangles_length();
+                u32 face_start = box_node.triangle_start();
+                u32 face_stop = face_start + box_node.triangles_length();
                 vec3g box_size = box_node.box.size();
 
                 // find the best divide strategy on each axes so that each halves have almost the same area.
@@ -173,7 +175,7 @@ public:
                     divide_line += delta * (left_area > right_area ? -1 : 1);
                     // calculate how many area in each side
                     left_area = right_area = 0;
-                    for (u32 index = box_node.triangle_start(); index < face_stop; index++)
+                    for (u32 index = face_start; index < face_stop; index++)
                     {
                         std::tuple<vec3g, fg> const& info = trian_infos[index];
                         fg tmp = std::get<0>(info).x - divide_line;
@@ -181,7 +183,7 @@ public:
                         if (tmp <= 0) { left_area += std::get<1>(info); }
                         else { right_area += std::get<1>(info); }
                     }
-                    if (min_distance > delta) { break; } // even the nearest triangle is too far to reach
+                    if (min_distance >= delta) { break; } // even the nearest triangle is too far to reach
                 }
 
                 // divide on y-axis
@@ -194,7 +196,7 @@ public:
                     d_l += delta * (l_a > r_a ? -1 : 1);
                     // calculate how many area in each side
                     l_a = r_a = 0;
-                    for (u32 index = box_node.triangle_start(); index < face_stop; index++)
+                    for (u32 index = face_start; index < face_stop; index++)
                     {
                         std::tuple<vec3g, fg> const& info = trian_infos[index];
                         fg tmp = std::get<0>(info).y - d_l;
@@ -202,7 +204,7 @@ public:
                         if (tmp <= 0) { l_a += std::get<1>(info); }
                         else { r_a += std::get<1>(info); }
                     }
-                    if (min_distance > delta) { break; } // even the nearest triangle is too far to reach
+                    if (min_distance >= delta) { break; } // even the nearest triangle is too far to reach
                 }
                 // replace the strategy if the divide on y-axis is better than on x-aixs
                 if (std::abs(l_a - r_a) < std::abs(left_area - right_area))
@@ -222,7 +224,7 @@ public:
                     d_l += delta * (l_a > r_a ? -1 : 1);
                     // calculate how many area in each side
                     l_a = r_a = 0;
-                    for (u32 index = box_node.triangle_start(); index < face_stop; index++)
+                    for (u32 index = face_start; index < face_stop; index++)
                     {
                         std::tuple<vec3g, fg> const& info = trian_infos[index];
                         fg tmp = std::get<0>(info).z - d_l;
@@ -230,7 +232,7 @@ public:
                         if (tmp <= 0) { l_a += std::get<1>(info); }
                         else { r_a += std::get<1>(info); }
                     }
-                    if (min_distance > delta) { break; } // even the nearest triangle is too far to reach
+                    if (min_distance >= delta) { break; } // even the nearest triangle is too far to reach
                 }
                 // replace the strategy if the divide on z-axis is better than above
                 if (std::abs(l_a - r_a) < std::abs(left_area - right_area))
@@ -258,16 +260,18 @@ public:
 
                     constexpr u32 invalid_index = std::numeric_limits<u32>::max();
                     // swap triangles to left part and right part
-                    u32 face_start = box_node.triangle_start();
                     u32 index_right_start = invalid_index;
-                    for (u32 index = face_start + 1; index < face_stop; index++)
+                    for (u32 index = face_start; index < face_stop; index++)
                     {
-                        if ((index_right_start != invalid_index) && (strategy_axis(std::get<0>(trian_infos[index])) <= divide_line))
+                        if (strategy_axis(std::get<0>(trian_infos[index])) <= divide_line)
                         {
-                            std::swap(      faces[index_right_start],       faces[index]);
-                            std::swap( _triangles[index_right_start],  _triangles[index]);
-                            std::swap(trian_infos[index_right_start], trian_infos[index]);
-                            index_right_start++;
+                            if (index_right_start != invalid_index)
+                            {
+                                std::swap(      faces[index_right_start],       faces[index]);
+                                std::swap( _triangles[index_right_start],  _triangles[index]);
+                                std::swap(trian_infos[index_right_start], trian_infos[index]);
+                                index_right_start++;
+                            }
                         }
                         else if (index_right_start == invalid_index)
                         {
@@ -276,15 +280,14 @@ public:
                     }
 
                     // contruct child-boxes
-                    unprocessed_boxes.emplace(box_depth + 1, BoxNode(vertices, faces, face_start, index_right_start - face_start));
                     box_node.index_l = box_count++;
-                    unprocessed_boxes.emplace(box_depth + 1, BoxNode(vertices, faces, index_right_start, face_stop - index_right_start));
                     box_node.index_r = box_count++;
+                    boxes_depth.emplace_back(box_depth + 1);
+                    boxes_depth.emplace_back(box_depth + 1);
+                    _boxes.emplace_back(vertices, faces, face_start, index_right_start - face_start);
+                    _boxes.emplace_back(vertices, faces, index_right_start, face_stop - index_right_start);
                 }
             }
-
-            _boxes.push_back(box_node);
-            unprocessed_boxes.pop();
         }
     }
 
@@ -318,9 +321,75 @@ public:
 
         _subdivide();
 
+#ifdef SHOW_TRACE_INFO
         std::cout << "# of triangles: " << _triangles.size() << ", # of boxes: " << _boxes.size() << std::endl;
+#endif
 
         return prepared = true;
+    }
+
+
+    /******** mesh trasformations ********/
+
+    Mesh & project_to_sphere(fg radius = 1) noexcept
+    {
+        prepared = false;
+        for (vec3g & vertex : vertices)
+        {
+            vertex *= radius / length(vertex);
+        }
+        return *this;
+    }
+
+    Mesh & subdivise(u32 subdivision = 2)
+    {
+        if (subdivision < 2) { return *this; }
+        prepared = false;
+
+        // TODO: share the new vertices belong the edges
+        decltype(vertices) new_vertices;
+        decltype(faces) new_faces;
+        new_vertices.reserve(faces.size() * (((subdivision + 1) * (subdivision + 2)) >> 1));
+        new_faces.reserve(faces.size() * sqr(subdivision));
+
+        u32 vertex_index = 0;
+        for (vec3<u32> const& face : faces)
+        {
+            vec3g const& A = vertices[face.x];
+            vec3g const& B = vertices[face.y];
+            vec3g const& C = vertices[face.z];
+            vec3g ACn = (C - A) / subdivision;
+            vec3g CBn = (B - C) / subdivision;
+
+            vec3g m1 = A;
+            for (u32 u = 0; u <= subdivision; u++)
+            {
+                vec3g m2 = m1;
+                for (u32 v = 0; v <= u; v++)
+                {
+                    new_vertices.push_back(m2);
+                    m2 += CBn;
+                }
+                m1 += ACn;
+            }
+
+            for (u32 u = 0; u < subdivision; u++)
+            {
+                for (u32 v = 0; v < u; v++)
+                {
+                    new_faces.emplace_back(vertex_index, vertex_index + u + 2, vertex_index + u + 1);
+                    new_faces.emplace_back(vertex_index, vertex_index + 1, vertex_index + u + 2);
+                    vertex_index++;
+                }
+                new_faces.emplace_back(vertex_index, vertex_index + u + 2, vertex_index + u + 1);
+                vertex_index++;
+            }
+            vertex_index += subdivision + 1;
+        }
+
+        vertices.swap(new_vertices);
+        faces.swap(new_faces);
+        return *this;
     }
 
 
@@ -330,16 +399,20 @@ public:
     {
         bool hit = false;
         auto [time_in, time_out] = _boxes.front().box.trace(ray);
+#ifdef SHOW_TRACE_INFO
         rec.box_count++;
+#endif
         if ((time_out < defaults<fg>::eps) || (time_in >= time_out)) { return hit; }
 
-        std::stack<std::tuple<BoxNode const&, fg>> to_trace_boxes;
-        to_trace_boxes.emplace(_boxes.front(), time_in);
+        using StackEltype = std::tuple<BoxNode const* /* box */, fg /* time_in */>;
+        StackEltype to_trace_boxes[max_boxes_depth + 1];
+        StackEltype * box_p = to_trace_boxes;
+        *box_p = {_boxes.data(), time_in};
 
-        while (!to_trace_boxes.empty())
+        while (box_p >= to_trace_boxes)
         {
-            auto [box_node, time_in] = to_trace_boxes.top();
-            to_trace_boxes.pop();
+            BoxNode const& box_node = *std::get<0>(*box_p);
+            time_in = std::get<1>(*(box_p--));
 
             if (time_in >= rec.max_ray_time) { continue; }
 
@@ -349,12 +422,10 @@ public:
                 Triangle const* stop = triangle_p + box_node.triangles_length();
                 for (; triangle_p < stop; triangle_p++)
                 {
+                    hit |= triangle_p->trace(ray, rec);
+#ifdef SHOW_TRACE_INFO
                     rec.triangle_count++;
-                    if (triangle_p->trace(ray, rec))
-                    {
-                        hit = true;
-                        rec.mesh_p = this;
-                    }
+#endif
                 }
             }
             else
@@ -364,7 +435,9 @@ public:
                 BoxNode const* child_r = &_boxes[box_node.rightchild()];
                 auto [in_l, out_l] = child_l->box.trace(ray);
                 auto [in_r, out_r] = child_r->box.trace(ray);
+#ifdef SHOW_TRACE_INFO
                 rec.box_count += 2;
+#endif
 
                 // sort them so that the first hit is the left one
                 if (in_r < in_l)
@@ -377,11 +450,11 @@ public:
                 // push them in to stack (or not)
                 if ((out_r >= defaults<fg>::eps) && (in_r < out_r))
                 {
-                    to_trace_boxes.emplace(*child_r, in_r);
+                    *(++box_p) = {child_r, in_r};
                 }
                 if ((out_l >= defaults<fg>::eps) && (in_l < out_l))
                 {
-                    to_trace_boxes.emplace(*child_l, in_l);
+                    *(++box_p) = {child_l, in_l};
                 }
             }
         }
@@ -396,37 +469,186 @@ public:
         std::ifstream file(path);
         return load_obj(file);
     }
-    static MeshPtr load_obj(std::ifstream & file)
-    {
-        MeshPtr mesh_p = std::make_shared<Mesh>();
-        if (!file.is_open()) { return mesh_p; }
+    static MeshPtr load_obj(std::ifstream & file);
 
-        vec3g v; vec3<u32> indeces;
 
-        for (std::string line, part; std::getline(file, line);)
-        {
-            std::stringstream line_buff(line);
-            line_buff >> part;
+    /******** mesh generations ********/
 
-            if (part == "v")        // geometric vertix
-            {
-                line_buff >> part; v.x =  s2n<fg>(part);
-                line_buff >> part; v.z =  s2n<fg>(part);
-                line_buff >> part; v.y = -s2n<fg>(part);
-                // should left nothing in `line_buff`
-                mesh_p->vertices.push_back(v);
-            }
-            else if (part == "f")   // polygonal face element
-            {
-                line_buff >> part; indeces.x = s2n<u32>(part);
-                line_buff >> part; indeces.y = s2n<u32>(part);
-                line_buff >> part; indeces.z = s2n<u32>(part);
-                // TODO: support many indces `.../.../...`
-                // TODO: slpit polygon to triangles
-                mesh_p->faces.push_back(indeces -= 1);
-            }
-        }
+    static MeshPtr tetrahedron();
+    static MeshPtr hexahedron();
+    static MeshPtr octahedron();
+    static MeshPtr dodecahedron();
+    static MeshPtr icosahedron();
 
-        return mesh_p;
-    }
+    static MeshPtr uv_sphere(u32 n_longitude, u32 n_latitude);
 };
+
+
+MeshPtr Mesh::load_obj(std::ifstream & file)
+{
+    MeshPtr mesh_p = std::make_shared<Mesh>();
+    if (!file.is_open()) { return mesh_p; }
+
+    vec3g v; vec3<u32> indeces;
+
+    for (std::string line, part; std::getline(file, line);)
+    {
+        std::stringstream line_buff(line);
+        line_buff >> part;
+
+        if (part == "v")        // geometric vertix
+        {
+            line_buff >> part; v.x =  s2n<fg>(part);
+            line_buff >> part; v.z =  s2n<fg>(part);
+            line_buff >> part; v.y = -s2n<fg>(part);
+            // should left nothing in `line_buff`
+            mesh_p->vertices.push_back(v);
+        }
+        else if (part == "f")   // polygonal face element
+        {
+            line_buff >> part; indeces.x = s2n<u32>(part);
+            line_buff >> part; indeces.y = s2n<u32>(part);
+            line_buff >> part; indeces.z = s2n<u32>(part);
+            // TODO: support many indces `.../.../...`
+            // TODO: slpit polygon to triangles
+            mesh_p->faces.push_back(indeces -= 1);
+        }
+    }
+
+    return mesh_p;
+}
+
+MeshPtr Mesh::tetrahedron()
+{
+    MeshPtr mesh_p = std::make_shared<Mesh>();
+    mesh_p->vertices.reserve(4);
+    mesh_p->faces.reserve(4);
+
+    f32 root2 = std::sqrt(2.0f);
+    f32 z = -defaults<f32>::third;
+    f32 x1 = 2 * root2 / 3;
+    f32 x2 = -root2 / 3;
+    f32 y = std::sqrt(2.0f / 3.0f);
+
+    mesh_p->vertices.emplace_back(0,   0, 1);
+    mesh_p->vertices.emplace_back(x1,  0, z);
+    mesh_p->vertices.emplace_back(x2, -y, z);
+    mesh_p->vertices.emplace_back(x2,  y, z);
+
+    mesh_p->faces.emplace_back(1, 2, 3);
+    mesh_p->faces.emplace_back(1, 0, 2);
+    mesh_p->faces.emplace_back(1, 3, 0);
+    mesh_p->faces.emplace_back(0, 3, 2);
+
+    return mesh_p;
+}
+
+MeshPtr Mesh::hexahedron()
+{
+    MeshPtr mesh_p = std::make_shared<Mesh>();
+    mesh_p->vertices.reserve(8);
+    mesh_p->faces.reserve(12);
+
+    f32 v = 1.0f / std::sqrt(3.0f);
+
+    mesh_p->vertices.emplace_back(-v, -v, -v);
+    mesh_p->vertices.emplace_back( v, -v, -v);
+    mesh_p->vertices.emplace_back( v,  v, -v);
+    mesh_p->vertices.emplace_back(-v,  v, -v);
+    mesh_p->vertices.emplace_back(-v, -v,  v);
+    mesh_p->vertices.emplace_back( v, -v,  v);
+    mesh_p->vertices.emplace_back( v,  v,  v);
+    mesh_p->vertices.emplace_back(-v,  v,  v);
+
+    mesh_p->faces.emplace_back(0, 3, 2);
+    mesh_p->faces.emplace_back(0, 2, 1);
+    mesh_p->faces.emplace_back(0, 1, 5);
+    mesh_p->faces.emplace_back(0, 5, 4);
+    mesh_p->faces.emplace_back(1, 2, 6);
+    mesh_p->faces.emplace_back(1, 6, 5);
+    mesh_p->faces.emplace_back(2, 3, 7);
+    mesh_p->faces.emplace_back(2, 7, 6);
+    mesh_p->faces.emplace_back(3, 0, 4);
+    mesh_p->faces.emplace_back(3, 4, 7);
+    mesh_p->faces.emplace_back(4, 5, 7);
+    mesh_p->faces.emplace_back(5, 6, 7);
+
+    return mesh_p;
+}
+
+MeshPtr Mesh::octahedron()
+{
+    MeshPtr mesh_p = std::make_shared<Mesh>();
+    mesh_p->vertices.reserve(6);
+    mesh_p->faces.reserve(8);
+
+    mesh_p->vertices.emplace_back( 0,  0,  1);
+    mesh_p->vertices.emplace_back( 1,  0,  0);
+    mesh_p->vertices.emplace_back( 0,  1,  0);
+    mesh_p->vertices.emplace_back(-1,  0,  0);
+    mesh_p->vertices.emplace_back( 0, -1,  0);
+    mesh_p->vertices.emplace_back( 0,  0, -1);
+
+    mesh_p->faces.emplace_back(0, 1, 2);
+    mesh_p->faces.emplace_back(0, 2, 3);
+    mesh_p->faces.emplace_back(0, 3, 4);
+    mesh_p->faces.emplace_back(0, 4, 1);
+    mesh_p->faces.emplace_back(5, 2, 1);
+    mesh_p->faces.emplace_back(5, 3, 2);
+    mesh_p->faces.emplace_back(5, 4, 3);
+    mesh_p->faces.emplace_back(5, 1, 4);
+
+    return mesh_p;
+}
+
+// TODO: MeshPtr Mesh::dodecahedron()
+
+// TODO: MeshPtr Mesh::icosahedron()
+
+MeshPtr Mesh::uv_sphere(u32 n_longitude, u32 n_latitude)
+{
+    n_longitude = std::max(2u, n_longitude);
+    n_latitude  = std::max(1u, n_latitude);
+
+    MeshPtr mesh_p = std::make_shared<Mesh>();
+    mesh_p->vertices.reserve(n_longitude * n_latitude + 2);
+    mesh_p->faces.reserve(n_longitude * n_latitude * 2);
+
+    mesh_p->vertices.emplace_back(0, 0,  1);    // top vertex
+    mesh_p->vertices.emplace_back(0, 0, -1);    // bottom vertex
+    for (u32 latitude_count = 0; latitude_count < n_latitude; latitude_count++)
+    {
+        fg theta = defaults<fg>::pi * (latitude_count + 1) / (n_latitude + 1);
+        fg stheta = std::sin(theta), ctheta = std::cos(theta);
+        for (u32 longitude_count = 0; longitude_count < n_longitude; longitude_count++)
+        {
+            fg phi = defaults<fg>::two_pi * longitude_count / n_longitude;
+            fg sphi = std::sin(phi), cphi = std::cos(phi);
+            mesh_p->vertices.emplace_back(cphi * stheta, sphi * stheta, ctheta);
+        }
+    }
+
+    u32 last_round_vertices_index = (n_latitude - 1) * n_longitude + 2;
+    for (u32 longitude_count = 1; longitude_count < n_longitude; longitude_count++)
+    {
+        mesh_p->faces.emplace_back(0, longitude_count + 1, longitude_count + 2);    // top faces
+        mesh_p->faces.emplace_back(1, last_round_vertices_index + longitude_count, last_round_vertices_index + longitude_count - 1);    // bottom faces
+    }
+    mesh_p->faces.emplace_back(0, n_longitude + 1, 2);  // top face when longitude_count = 0
+    mesh_p->faces.emplace_back(1, last_round_vertices_index, last_round_vertices_index + n_longitude - 1);  // bottom face when longitude_count = 0
+    for (u32 latitude_count = 1; latitude_count < n_latitude; latitude_count++)
+    {
+        u32 vertices_index = n_longitude * latitude_count + 2;
+        for (u32 longitude_count = 1; longitude_count < n_longitude; longitude_count++)
+        {
+            // rectangle
+            mesh_p->faces.emplace_back(vertices_index + longitude_count - 1, vertices_index + longitude_count, vertices_index - n_longitude + longitude_count - 1);
+            mesh_p->faces.emplace_back(vertices_index + longitude_count, vertices_index - n_longitude + longitude_count, vertices_index - n_longitude + longitude_count - 1);
+        }
+        // rectangle when longitude_count = 0
+        mesh_p->faces.emplace_back(vertices_index + n_longitude - 1, vertices_index, vertices_index - 1);
+        mesh_p->faces.emplace_back(vertices_index, vertices_index - n_longitude, vertices_index - 1);
+    }
+
+    return mesh_p;
+}

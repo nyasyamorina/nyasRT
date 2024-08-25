@@ -6,6 +6,7 @@
 #include "vec3.hpp"
 #include "vec4.hpp"
 #include "Ray.hpp"
+#include "Mesh.hpp"
 
 
 class Rotation final
@@ -157,5 +158,26 @@ public:
     CONST_FUNC Ray undo(Ray const& ray) const noexcept
     {
         return Ray(undo_point(ray.origin), undo_vector(ray.direction));
+    }
+
+    CONST_FUNC Mesh & apply(Mesh & mesh) const noexcept
+    {
+        // the subdivide boxes will bread
+        mesh.prepared = false;
+        for (vec3g & vertex : mesh.vertices)
+        {
+            vertex = apply_point(vertex);
+        }
+        return mesh;
+    }
+    CONST_FUNC Mesh & undo(Mesh & mesh) const noexcept
+    {
+        // the subdivide boxes will bread
+        mesh.prepared = false;
+        for (vec3g & vertex : mesh.vertices)
+        {
+            vertex = undo_point(vertex);
+        }
+        return mesh;
     }
 };

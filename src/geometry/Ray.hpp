@@ -35,23 +35,28 @@ public:
     fg max_ray_time;
     vec3g hit_point, normal;
     vec2g hit_local;
-    Triangle const* triangle_p;
-    Mesh const* mesh_p;
     Object3D const* object_p;
+#ifdef SHOW_TRACE_INFO
     u32 box_count, triangle_count;
+#endif
 
     CONST_FUNC TraceRecord() noexcept
     : ray_color{defaults<RGB>::Black}, reflect_color{defaults<RGB>::White}
-    , max_ray_time{std::numeric_limits<fg>::max()}, hit_point{defaults<vec3g>::O}, normal{defaults<vec3g>::Z}
-    , hit_local{defaults<vec2g>::O}, triangle_p{nullptr}, mesh_p{nullptr}, object_p{nullptr}
-    , box_count{0}, triangle_count{0} {}
+    , max_ray_time{std::numeric_limits<fg>::max()} , object_p{nullptr}
+#ifdef SHOW_TRACE_INFO
+    , box_count{0}, triangle_count{0}
+#endif
+    {}
 
     CONST_FUNC TraceRecord & reset() noexcept
     {
         max_ray_time = std::numeric_limits<fg>::max();
-        triangle_p = nullptr;
-        mesh_p = nullptr;
         object_p = nullptr;
         return *this;
+    }
+
+    CONST_FUNC bool hit_object() const noexcept
+    {
+        return object_p != nullptr;
     }
 };

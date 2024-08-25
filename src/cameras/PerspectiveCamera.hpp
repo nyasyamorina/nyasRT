@@ -19,7 +19,7 @@ public:
 
     PerspectiveCamera() noexcept
     : _view{defaults<vec3g>::O, defaults<vec3g>::X}, _horizontal{-defaults<vec3g>::Y}, _vertical{defaults<vec3g>::Z} {}
-    virtual ~PerspectiveCamera() noexcept {}
+    virtual ~PerspectiveCamera() noexcept = default;
 
 
     virtual Ray cast_ray(vec2g const& screen_position) const noexcept override
@@ -29,7 +29,7 @@ public:
     }
 
 
-    // can be used in `set_view_direction(view_direction, view_up)`
+    // can be used in `view_direction(view_direction, view_up)`
     static CONST_FUNC vec3g choose_view_up(vec3g const& view_direction_) noexcept
     {
         if ((std::abs(view_direction_.z) > defaults<fg>::eps) &&
@@ -47,16 +47,16 @@ public:
 
     /******** setters ********/
 
-    PerspectiveCamera & set_view_origin(vec3g const& view_origin_) noexcept
+    PerspectiveCamera & view_origin(vec3g const& view_origin_) noexcept
     {
         _view.origin = view_origin_;
         return *this;
     }
-    PerspectiveCamera & set_view_angle(fg yaw, fg pitch) noexcept
+    PerspectiveCamera & view_angle(fg yaw, fg pitch) noexcept
     {
-        return set_view_angle(yaw, pitch, static_cast<fg>(0));
+        return view_angle(yaw, pitch, static_cast<fg>(0));
     }
-    PerspectiveCamera & set_view_angle(fg yaw, fg pitch, fg roll) noexcept
+    PerspectiveCamera & view_angle(fg yaw, fg pitch, fg roll) noexcept
     {
         fg ld = length(_view.direction);
         fg lh = length(_horizontal);
@@ -72,11 +72,11 @@ public:
 
         return *this;
     }
-    PerspectiveCamera & set_view_direction(vec3g const& view_direction_) noexcept
+    PerspectiveCamera & view_direction(vec3g const& view_direction_) noexcept
     {
-        return set_view_direction(view_direction_, _vertical);
+        return view_direction(view_direction_, _vertical);
     }
-    PerspectiveCamera & set_view_direction(vec3g const& view_direction_, vec3g const& view_up) noexcept
+    PerspectiveCamera & view_direction(vec3g const& view_direction_, vec3g const& view_up) noexcept
     {
         fg nh = length(_horizontal) * (length(view_direction_) / length(_view.direction));
         fg nv = length(_vertical  ) * (length(view_direction_) / length(_view.direction));
@@ -89,7 +89,7 @@ public:
 
         return *this;
     }
-    PerspectiveCamera & set_view_plane_distance(fg view_plane_distance_) noexcept
+    PerspectiveCamera & view_plane_distance(fg view_plane_distance_) noexcept
     {
         fg multiplier = view_plane_distance_ / length(_view.direction);
         _view.direction *= multiplier;
@@ -97,13 +97,13 @@ public:
         _vertical *= multiplier;
         return *this;
     }
-    PerspectiveCamera & set_field_of_view(fg fov) noexcept
+    PerspectiveCamera & field_of_view(fg fov) noexcept
     {
         fg n = std::tan(static_cast<fg>(0.5) * fov) * length(_view.direction) / length(_horizontal);
         _horizontal *= n; _vertical *= n;
         return *this;
     }
-    PerspectiveCamera & set_aspect_ratio(fg aspect_ratio_) noexcept
+    PerspectiveCamera & aspect_ratio(fg aspect_ratio_) noexcept
     {
         _vertical *= length(_horizontal) / (aspect_ratio_ * length(_vertical));
         return *this;

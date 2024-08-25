@@ -115,23 +115,48 @@ public:
     RGB render_screen(vec2g const& position) const noexcept
     {
         Ray ray = _scence.camera_ref().cast_ray(position);  // ray.direction has been normalized
-        RGB ray_color;
-
         TraceRecord rec;
-        for (Object3D const& object : _scence.objects)
-        {
-            object.trace(ray, rec);
-        }
+        u32 bounds = 0;
 
-        if (rec.object_p != nullptr)
+        while (true)
         {
-            ray_color = rec.normal;
+            // tracing ray
+            rec.reset();
+            for (Object3D const& object : _scence.objects)
+            {
+                object.trace(ray, rec);
+            }
+
+            if ((bounds < config.max_ray_bounds) && rec.hit_object())
+            {
+                // next bounds direction
+                vec3g incoming = -ray.direction;
+                auto [outgoing, reflected] = rec.object_p->brdf_p->bounds(incoming, rec.normal);
+
+                // render object surface
+                rec.ray_color += rec.reflect_color * rec.object_p->brdf_p->emitted(incoming, rec.normal);
+                rec.reflect_color *= reflected;
+
+                // ray bounds
+                ray.origin = rec.hit_point;
+                ray.direction = outgoing;
+                bounds++;
+            }
+            else
+            {
+                // render sky
+                if (!rec.hit_object() && _scence.has_sky())
+                {
+                    rec.ray_color += rec.reflect_color * _scence.sky_ref()(ray.direction);
+                }
+#ifdef SHOW_TRACE_INFO
+                constexpr RGB trace_info_scaler = RGB(1000, 1000, 10);
+                rec.ray_color = RGB(rec.box_count, rec.triangle_count, bounds).div(trace_info_scaler);
+#endif
+                break;
+            }
         }
-        else if (_scence.has_sky())
-        {
-            ray_color = _scence.sky_ref()(ray.direction);
-        }
-        return ray_color;
+        return rec.ray_color;
     }
 
     void render(Figure & fig) const noexcept

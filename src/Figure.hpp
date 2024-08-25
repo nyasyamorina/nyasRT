@@ -240,7 +240,7 @@ private:
         return 3 * c.r + 5 * c.g + 7 * c.b + (11 * 255/*a*/) & 63;
     }
 
-    static CONST_FUNC void set_diff(RGB24 & d, RGB24 c) noexcept
+    static CONST_FUNC void diff(RGB24 & d, RGB24 c) noexcept
     {
         d.r = c.r - d.r + static_cast<u8>(2);
         d.g = c.g - d.g + static_cast<u8>(2);
@@ -251,7 +251,7 @@ private:
         return (c.r < 4) && (c.g < 4) && (c.b < 4);
     }
 
-    static CONST_FUNC void set_luma(RGB24 & c) noexcept
+    static CONST_FUNC void luma(RGB24 & c) noexcept
     {
         c.r += static_cast<u8>(8) - c.g;
         c.b += static_cast<u8>(8) - c.g;
@@ -333,13 +333,13 @@ public:
             }
 
             else {
-                if (set_diff(prev, curr); can_encode_diff(prev))// -> QOI_OP_DIFF
+                if (diff(prev, curr); can_encode_diff(prev))    // -> QOI_OP_DIFF
                 {
                     encoded = 0x40 | (prev.r << 4) | (prev.g << 2) | prev.b;
                     write(&encoded, 1);
                 }
 
-                else if (set_luma(prev); can_encode_luma(prev)) // -> QOI_OP_LUMA
+                else if (luma(prev); can_encode_luma(prev))     // -> QOI_OP_LUMA
                 {
                     encoded = 0x80 | prev.g;
                     write(&encoded, 1);

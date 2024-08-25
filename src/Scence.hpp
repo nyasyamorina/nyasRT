@@ -56,6 +56,17 @@ public:
     }
 
 
+    Scence & camera(CameraPtr camera_) noexcept
+    {
+        _camera_p = camera_;
+        return *this;
+    }
+    Scence & sky(SkyPtr sky_) noexcept
+    {
+        _sky_p = sky_;
+        return *this;
+    }
+
     CameraPtr camera() noexcept
     {
         return _camera_p;
@@ -79,16 +90,5 @@ public:
     Sky const& sky_ref() const noexcept
     {
         return *_sky_p;
-    }
-
-    Scence & set_camera(CameraPtr camera_) noexcept
-    {
-        _camera_p = camera_;
-        return *this;
-    }
-    Scence & set_sky(SkyPtr sky_) noexcept
-    {
-        _sky_p = sky_;
-        return *this;
     }
 };

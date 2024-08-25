@@ -2,6 +2,7 @@
 
 #include <bit>
 #include <chrono>
+#include <math.h>
 #include <numeric>
 #include <thread>
 
@@ -67,7 +68,7 @@ public:
 static thread_local PCG_XSH_RR_32 random;
 
 
-inline void keep_period_or_not(PCG_XSH_RR_32 & rng) noexcept
+inline void _keep_period_or_not(PCG_XSH_RR_32 & rng) noexcept
 {
     if constexpr (KEEP_PERIOD_LONG_AS_POSSIBLE)
     {
@@ -82,12 +83,12 @@ public:
 
     static CONST_FUNC vec2<T> randbits(PCG_XSH_RR_32 & rng) noexcept
     {
-        keep_period_or_not(rng);
+        _keep_period_or_not(rng);
         return vec2<T>(rng.randbits<T>(), rng.randbits<T>());
     }
     static CONST_FUNC vec2<T> uniform01(PCG_XSH_RR_32 & rng) noexcept
     {
-        keep_period_or_not(rng);
+        _keep_period_or_not(rng);
         return vec2<T>(rng.uniform01<T>(), rng.uniform01<T>());
     }
 };
@@ -110,12 +111,12 @@ public:
 
     static CONST_FUNC vec4<T> randbits(PCG_XSH_RR_32 & rng) noexcept
     {
-        keep_period_or_not(rng);
+        _keep_period_or_not(rng);
         return vec4<T>(rng.randbits<T>(), rng.randbits<T>(), rng.randbits<T>(), rng.randbits<T>());
     }
     static CONST_FUNC vec4<T> uniform01(PCG_XSH_RR_32 & rng) noexcept
     {
-        keep_period_or_not(rng);
+        _keep_period_or_not(rng);
         return vec4<T>(rng.uniform01<T>(), rng.uniform01<T>(), rng.uniform01<T>(), rng.uniform01<T>());
     }
 };
@@ -139,7 +140,7 @@ public:
 
     static CONST_FUNC u64 randbits(PCG_XSH_RR_32 & rng) noexcept
     {
-        keep_period_or_not(rng);
+        _keep_period_or_not(rng);
         return (static_cast<u64>(rng.get()) << 32) | static_cast<u64>(rng.get());
     }
     static CONST_FUNC u64 uniform01(PCG_XSH_RR_32 &) noexcept

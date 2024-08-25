@@ -8,6 +8,7 @@
 #include "geometry/Ray.hpp"
 #include "geometry/Mesh.hpp"
 #include "geometry/Transform.hpp"
+#include "BRDFs/BRDF.hpp"
 
 
 class Object3D
@@ -16,18 +17,18 @@ public:
 
     MeshPtr mesh_p;
     Transform transform;
-    // TODO:
+    BRDFPtr brdf_p;
 
     Object3D() noexcept
-    : mesh_p{nullptr}, transform{} {}
-    Object3D(MeshPtr mesh) noexcept
-    : mesh_p{mesh}, transform{} {}
+    : mesh_p{nullptr}, transform{}, brdf_p{nullptr} {}
+    Object3D(MeshPtr mesh, BRDFPtr brdf) noexcept
+    : mesh_p{mesh}, transform{}, brdf_p(brdf) {}
 
 
     bool prepare()
     {
-        if (mesh_p == nullptr) { return false; }
-        return mesh_p->prepare();
+        if ((mesh_p == nullptr) || (brdf_p == nullptr)) { return false; }
+        return mesh_p->prepare() && brdf_p->prepare();
     }
 
 

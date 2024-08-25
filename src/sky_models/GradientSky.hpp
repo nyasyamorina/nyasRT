@@ -11,7 +11,7 @@ public:
 
     GradientSky(RGB const& top, RGB const& bottom)
     : top_color{top}, bottom_color{bottom} {}
-    virtual ~GradientSky() noexcept {}
+    virtual ~GradientSky() noexcept = default;
 
 
     virtual RGB operator () (vec3g const& NORMALIZED direction) const noexcept override
