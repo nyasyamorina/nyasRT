@@ -44,8 +44,11 @@ i32 main(i32, char * *)
     scence.objects.emplace_back(mesh_p);
     scence.objects.back().transform.rotate(defaults<vec3g>::X, deg2rad(-90.0)).rotate(defaults<vec3g>::Z, deg2rad(-45.0)).scale(0.8).shift(vec3g(0, -4.3, 1.3));
 
+    auto sky_p = std::make_shared<GradientSky>(RGB(0.25f, 0.5f, 1.0f), RGB(1.0f));
+    scence.set_sky(sky_p);
+
     auto camera_p = std::make_shared<PerspectiveCamera>();
-    camera_p->set_view_origin(vec3g(8, 10, 9.5)).set_view_direction(-vec3g(8, 10, 7.5)).set_aspect_ratio(fig.aspect_ratio()).set_field_of_view(deg2rad(45.0));
+    camera_p->set_view_origin(vec3g(9, 10, 9.5)).set_view_direction(-vec3g(8.5, 10, 7.3)).set_aspect_ratio(fig.aspect_ratio()).set_field_of_view(deg2rad(45.0));
     scence.set_camera(camera_p);
 
     auto start_0 = system_clock::now();

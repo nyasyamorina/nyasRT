@@ -226,7 +226,7 @@ public:
         return n;
     }
 
-    template<class U> CONST_FUNC vec3 & reflect(vec3<U> const& n) noexcept
+    template<class U> CONST_FUNC vec3 & reflect(vec3<U> const& NORMALIZED n) noexcept
     {
         auto a = x * n.x + y * n.y + z * n.z;
         constexpr decltype(a) two = static_cast<decltype(a)>(2);
@@ -500,7 +500,7 @@ template<class T> CONST_FUNC std::tuple<vec3<T>, T> normlen(vec3<T> const& v) no
     return {vec3(v.x / n, v.y / n, v.z / n), n};
 }
 
-template<class T, class U> vec3<std::common_type_t<T, U>> reflect(vec3<T> const& v, vec3<U> const& n) noexcept
+template<class T, class U> vec3<std::common_type_t<T, U>> reflect(vec3<T> const& v, vec3<U> const& NORMALIZED n) noexcept
 {
     return v - static_cast<std::common_type_t<T, U>>(2) * dot(v, n) * n;
 }

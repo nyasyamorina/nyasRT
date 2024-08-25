@@ -16,10 +16,10 @@ public:
 
     CONST_FUNC Rotation() noexcept
     : quaternion{defaults<vec4g>::W} {}
-    CONST_FUNC Rotation(vec4g const& q) noexcept
+    CONST_FUNC Rotation(vec4g const& NORMALIZED q) noexcept
     : quaternion{q} {}
-    CONST_FUNC Rotation(vec3g const& axis, fg angle) noexcept
-    : quaternion{std::sin(defaults<fg>::half * angle) * normalize(axis), std::cos(defaults<fg>::half * angle)} {}
+    CONST_FUNC Rotation(vec3g const& NORMALIZED axis, fg angle) noexcept
+    : quaternion{std::sin(defaults<fg>::half * angle) * axis, std::cos(defaults<fg>::half * angle)} {}
 
 
     CONST_FUNC Rotation & operator *= (Rotation const& rot) noexcept
@@ -103,7 +103,7 @@ public:
     CONST_FUNC Transform() noexcept
     : rotation{}, scaler{1}, offset{defaults<vec3g>::O} {}
 
-    CONST_FUNC Transform & rotate(vec3g const& axis, fg angle) noexcept
+    CONST_FUNC Transform & rotate(vec3g const& NORMALIZED axis, fg angle) noexcept
     {
         return rotate(Rotation(axis, angle));
     }

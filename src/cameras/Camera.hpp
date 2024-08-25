@@ -11,7 +11,7 @@ class Camera
 {
 public:
 
-    virtual bool prepare()
+    virtual bool prepare() noexcept
     {
         return true;
     }

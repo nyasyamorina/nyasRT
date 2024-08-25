@@ -11,6 +11,7 @@
 #include "geometry/Ray.hpp"
 #include "Object3D.hpp"
 #include "cameras/Camera.hpp"
+#include "sky_models/Sky.hpp"
 #include "Figure.hpp"
 #include "random.hpp"
 #include "Scence.hpp"
@@ -113,7 +114,8 @@ public:
     }
     RGB render_screen(vec2g const& position) const noexcept
     {
-        Ray ray = _scence.camera_ref().cast_ray(position);
+        Ray ray = _scence.camera_ref().cast_ray(position);  // ray.direction has been normalized
+        RGB ray_color;
 
         TraceRecord rec;
         for (Object3D const& object : _scence.objects)
@@ -121,19 +123,15 @@ public:
             object.trace(ray, rec);
         }
 
-        [[maybe_unused]] constexpr RGB tracing_info_scale = RGB(200, 200, 2);
-        //return RGB(rec.box_count, rec.triangle_count, rec.object_p != nullptr) / tracing_info_scale;
-
-        RGB normal_color;
         if (rec.object_p != nullptr)
         {
-            normal_color = rec.normal;
+            ray_color = rec.normal;
         }
-        else
+        else if (_scence.has_sky())
         {
-            normal_color = ray.direction.normalize();
+            ray_color = _scence.sky_ref()(ray.direction);
         }
-        return normal_color.add(1).div(2);
+        return ray_color;
     }
 
     void render(Figure & fig) const noexcept

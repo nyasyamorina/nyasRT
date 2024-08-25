@@ -7,6 +7,7 @@
 
 
 #define CONST_FUNC constexpr inline
+#define NORMALIZED /* indicate that the vector parameter should be normalized */
 
 
 using i8  = int8_t;
