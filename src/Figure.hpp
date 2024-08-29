@@ -27,8 +27,10 @@ protected:
 
 public:
 
+    Figure() noexcept
+    : _size{defaults<vec2<u32>>::O}, _pixels{nullptr} {}
     Figure(vec2<u32> size_)
-    : _size(size_), _pixels(_new_pixel_array()) {}
+    : _size{size_}, _pixels{_new_pixel_array()} {}
     Figure(vec2<u32> size_, RGB const& c)
     : Figure(size_) {
         for (RGB & rgb : (*this)) { rgb = c; }
@@ -68,6 +70,15 @@ public:
         return *this;
     }
 
+    Figure & swap(Figure & other) noexcept
+    {
+        if (this != &other)
+        {
+            std::swap(_size, other._size);
+            std::swap(_pixels, other._pixels);
+        }
+        return *this;
+    }
 
     /******** iterators & member access ********/
 

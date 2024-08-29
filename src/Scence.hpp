@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <thread>
 #include <vector>
 
@@ -92,3 +93,6 @@ public:
         return *_sky_p;
     }
 };
+
+using ScencePtr = std::shared_ptr<Scence>;
+using ScenceConstPtr = std::shared_ptr<Scence const>;

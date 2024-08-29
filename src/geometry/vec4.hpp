@@ -1436,9 +1436,8 @@ public:
 
     template<class U> CONST_FUNC vec4 & reflect(vec4<U> const& NORMALIZED n) noexcept
     {
-        auto a = x * n.x + y * n.y + z * n.z + w * n.w;
-        constexpr decltype(a) two = static_cast<decltype(a)>(2);
-        x -= two * a * n.x; y -= two * a * n.y; z -= two * a * n.z; w -= two * a * n.w;
+        auto a = x * n.x + y * n.y + z * n.z + w * n.w; a *= 2;
+        x -= a * n.x; y -= a * n.y; z -= a * n.z; w -= a * n.w;
         return *this;
     }
 

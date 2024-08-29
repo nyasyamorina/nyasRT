@@ -7,20 +7,15 @@ class SimpleSpecular : public BRDF
 {
 protected:
 
-    RGB _base_color, _emittion;
+    RGB _emittion;
     f32 _roughness, _clearcoat;
 
 public:
 
     CONST_FUNC SimpleSpecular() noexcept
-    : _base_color{defaults<RGB>::White}, _emittion{defaults<RGB>::Black}, _roughness{0.5f}, _clearcoat{0.5f} {}
+    : _emittion{defaults<RGB>::Black}, _roughness{0.5f}, _clearcoat{0.5f} {}
     virtual ~SimpleSpecular() noexcept = default;
 
-    CONST_FUNC SimpleSpecular & base_color(RGB const& value) noexcept
-    {
-        _base_color = value;
-        return *this;
-    }
     CONST_FUNC SimpleSpecular & emittion(RGB const& value) noexcept
     {
         _emittion = value;
@@ -37,10 +32,6 @@ public:
         return *this;
     }
 
-    CONST_FUNC RGB const& base_color() const noexcept
-    {
-        return _base_color;
-    }
     CONST_FUNC RGB const& emittion() const noexcept
     {
         return _emittion;
@@ -55,32 +46,37 @@ public:
     }
 
 
-    virtual CONST_FUNC std::tuple<vec3g, RGB> bounds(vec3g const& NORMALIZED incoming, vec3g & NORMALIZED normal) noexcept override
+    virtual CONST_FUNC std::tuple<vec3g, RGB> bounds(RGB const& base_color, Ray const& ray, TraceRecord const& rec) const noexcept override
     {
-        // sample on upper hemisphere with distribution `dΩ = cosθ*dθdφ`
-        if (dot(incoming, normal) < 0)  // ray hit surface from behind
+        if (dot(ray.direction, rec.face_normal) > 0) // ray hit surface from behind
         {
-            return {-incoming, defaults<RGB>::White};   // surface cannot be seen from behind
-            //normal.neg();
+            return {ray.direction, defaults<RGB>::White};   // surface cannot be seen from behind
         }
-        vec3g diffuse = normal + Sampler::sphere(random.uniform01<vec2g>());
-        if (fg lo = length(diffuse); lo >= defaults<fg>::eps) { diffuse *= 1 / lo; }
-        else { diffuse = normal; }
 
-        bool ray_hit_clearcoat = random.uniform01<f32>() < 0.25f * _clearcoat;
-        if (ray_hit_clearcoat) { return {diffuse, defaults<RGB>::White}; }
+        // sample on upper hemisphere with distribution `dΩ = cosθ*dθdφ`
+        vec3g outgoing = rec.interpolated_normal + Sampler::sphere(random.uniform01<vec2g>());
+        RGB surface_color = defaults<RGB>::White;
+        // normalize
+        if (fg lo = length(outgoing); lo >= defaults<fg>::eps) { outgoing *= 1 / lo; }
+        else { outgoing = rec.interpolated_normal; }
 
-        vec3g prefect_reflection = -reflect(incoming, normal);
-        vec3g outgoing = normalize(mix(prefect_reflection, diffuse, _roughness));
-        return {outgoing, _base_color};
+        if (random.uniform01<f32>() > 0.25f * _clearcoat)
+        {
+            vec3g prefect_reflection = reflect(ray.direction, rec.interpolated_normal);
+            outgoing = normalize(mix(prefect_reflection, outgoing, _roughness));
+            surface_color = base_color;
+        }
+
+        //if (dot(outgoing, rec.face_normal) < 0) { outgoing.reflect(rec.face_normal); }
+        return {outgoing, surface_color};
     }
 
-    virtual CONST_FUNC RGB emitted(vec3g const& NORMALIZED incoming, vec3g & NORMALIZED normal) const noexcept override
+    virtual CONST_FUNC RGB emitted(RGB const& base_color, Ray const& ray, TraceRecord const& rec) const noexcept override
     {
         return _emittion;
     }
 
-    virtual CONST_FUNC RGB operator () (vec3g const& NORMALIZED incoming, vec3g const& NORMALIZED outgoing, vec3g const& NORMALIZED normal) const noexcept override
+    virtual CONST_FUNC RGB operator () (RGB const& base_color, vec3g const& NORMALIZED incoming, vec3g const& NORMALIZED outgoing, vec3g const& NORMALIZED normal) const noexcept override
     {
         // unknown BRDF
         return RGB(-1.0f);

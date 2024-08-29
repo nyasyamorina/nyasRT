@@ -265,6 +265,15 @@ CONST_FUNC RGB operator / (RGB const& c1, RGB const& c2) noexcept
     return RGB(c1.r / c2.r, c1.g / c2.g, c1.b / c2.b);
 }
 
+CONST_FUNC RGB sqrt(RGB const& c) noexcept
+{
+    return RGB(std::sqrt(c.r), std::sqrt(c.g), std::sqrt(c.b));
+}
+CONST_FUNC RGB exp(RGB const& c) noexcept
+{
+    return RGB(std::exp(c.r), std::exp(c.g), std::exp(c.b));
+}
+
 
 /******** 3x8 bit RGB value ********/
 

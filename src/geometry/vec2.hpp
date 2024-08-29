@@ -94,9 +94,8 @@ public:
 
     template<class U> CONST_FUNC vec2 & reflect(vec2<U> const& NORMALIZED n) noexcept
     {
-        auto a = x * n.x + y * n.y;
-        constexpr decltype(a) two = static_cast<decltype(a)>(2);
-        x -= two * a * n.x; y -= two * a * n.y;
+        auto a = x * n.x + y * n.y; a *= 2;
+        x -= a * n.x; y -= a * n.y;
         return *this;
     }
 

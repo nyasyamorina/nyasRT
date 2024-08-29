@@ -63,21 +63,14 @@ public:
 
     CONST_FUNC std::tuple<fg, fg> trace(Ray const& ray) const noexcept
     {
-        vec3g min_time = (min_corner - ray.origin) / ray.direction;
-        vec3g max_time = (max_corner - ray.origin) / ray.direction;
+        vec3g inv_d = 1 / ray.direction;
+        vec3g min_time = (min_corner - ray.origin) * inv_d;
+        vec3g max_time = (max_corner - ray.origin) * inv_d;
 
-        std::tuple<fg, fg> time_in_out{std::numeric_limits<fg>::min(), std::numeric_limits<fg>::max()};
-
-        std::get<0>(time_in_out) = std::max(std::get<0>(time_in_out), std::signbit(ray.direction.x) ? max_time.x : min_time.x);
-        std::get<1>(time_in_out) = std::min(std::get<1>(time_in_out), std::signbit(ray.direction.x) ? min_time.x : max_time.x);
-
-        std::get<0>(time_in_out) = std::max(std::get<0>(time_in_out), std::signbit(ray.direction.y) ? max_time.y : min_time.y);
-        std::get<1>(time_in_out) = std::min(std::get<1>(time_in_out), std::signbit(ray.direction.y) ? min_time.y : max_time.y);
-
-        std::get<0>(time_in_out) = std::max(std::get<0>(time_in_out), std::signbit(ray.direction.z) ? max_time.z : min_time.z);
-        std::get<1>(time_in_out) = std::min(std::get<1>(time_in_out), std::signbit(ray.direction.z) ? min_time.z : max_time.z);
-
-        return time_in_out;
+        if (inv_d.x < 0) { std::swap(min_time.x, max_time.x); }
+        if (inv_d.y < 0) { std::swap(min_time.y, max_time.y); }
+        if (inv_d.z < 0) { std::swap(min_time.z, max_time.z); }
+        return {maximum(min_time), minimum(max_time)};
     }
     CONST_FUNC bool trace(Ray const& ray, TraceRecord const& rec) const noexcept
     {

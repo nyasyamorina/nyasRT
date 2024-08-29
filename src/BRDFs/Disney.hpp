@@ -32,49 +32,17 @@ public:
         return 1.0f / (v_dot_n + std::sqrt(aa + vv - aa * vv));
     }
 
-    class Diffuse : public BRDF
-    {
-    public:
-
-        RGB base_color;
-        f32 roughness;
-
-        CONST_FUNC Diffuse(RGB const& base_color_, f32 roughness_)
-        : base_color{base_color_}, roughness{roughness_} {}
-        virtual ~Diffuse() noexcept = default;
-
-        virtual CONST_FUNC RGB operator () (vec3g const& NORMALIZED incoming, vec3g const& NORMALIZED outgoing, vec3g const& NORMALIZED normal) const noexcept override
-        {
-            f32 i_dot_n = dot(incoming, normal), o_dot_n = dot(outgoing, normal);
-            if ((i_dot_n < 0) || (o_dot_n < 0)) { return defaults<RGB>::Black; }
-            vec3g half_vec = normalize(incoming + outgoing);
-            f32 d = dot(incoming, half_vec);
-
-            f32 f_d90 = defaults<f32>::half + 2 * roughness * sqr(d);
-            f32 fresnel_i = 1 + (f_d90 - 1) * schlick_fresnel(i_dot_n);
-            f32 fresnel_o = 1 + (f_d90 - 1) * schlick_fresnel(o_dot_n);
-            f32 fd = defaults<f32>::inv_pi * fresnel_i * fresnel_o;
-            return base_color * fd;
-        }
-    };
-
 private:
 
-    RGB _base_color;
     f32 _subsurface, _metalic, _specular, _specular_tint, _roughness, _sheen, _sheen_tint, _clearcoat, _clearcoat_gloss;
 
 public:
 
     CONST_FUNC DisneyBRDF() noexcept
-    : _base_color{defaults<RGB>::White}, _subsurface{0.5f}, _metalic{0.5f}, _specular{0.5f}, _specular_tint{0.5f}, _roughness{0.5f}
+    : _subsurface{0.5f}, _metalic{0.5f}, _specular{0.5f}, _specular_tint{0.5f}, _roughness{0.5f}
     , _sheen{0.5f}, _sheen_tint{0.5f}, _clearcoat{0.5f}, _clearcoat_gloss{0.5f} {}
     virtual ~DisneyBRDF() noexcept = default;
 
-    CONST_FUNC DisneyBRDF & base_color(RGB const& value) noexcept
-    {
-        _base_color = value;
-        return *this;
-    }
     CONST_FUNC DisneyBRDF & subsurface(f32 value) noexcept
     {
         _subsurface = value;
@@ -121,10 +89,6 @@ public:
         return *this;
     }
 
-    CONST_FUNC RGB const& base_color() const noexcept
-    {
-        return _base_color;
-    }
     CONST_FUNC f32 subsurface() const noexcept
     {
         return _subsurface;
@@ -164,16 +128,16 @@ public:
 
 
     // https://github.com/wdas/brdf/blob/main/src/brdfs/disney.brdf
-    virtual CONST_FUNC RGB operator () (vec3g const& NORMALIZED incoming, vec3g const& NORMALIZED outgoing, vec3g const& NORMALIZED normal) const noexcept override
+    virtual CONST_FUNC RGB operator () (RGB const& base_color, vec3g const& NORMALIZED incoming, vec3g const& NORMALIZED outgoing, vec3g const& NORMALIZED normal) const noexcept override
     {
         f32 i_dot_n = dot(incoming, normal), o_dot_n = dot(outgoing, normal);
         if ((i_dot_n < 0) || (o_dot_n < 0)) { return defaults<RGB>::Black; }
         vec3g half_vec = normalize(incoming + outgoing);
         f32 i_dot_h = dot(incoming, half_vec), h_dot_n = dot(half_vec, normal);
 
-        f32 lum = brightness(_base_color);
-        RGB tint_color = _base_color / lum;
-        RGB specular_color = mix(_specular * 0.08f * mix(1.0f, tint_color, _specular_tint), _base_color, _metalic);
+        f32 lum = brightness(base_color);
+        RGB tint_color = base_color / lum;
+        RGB specular_color = mix(_specular * 0.08f * mix(1.0f, tint_color, _specular_tint), base_color, _metalic);
         RGB sheen_color = mix(1.0f, tint_color, _sheen_tint);
 
         f32 fi = schlick_fresnel(i_dot_n), fo = schlick_fresnel(o_dot_n), fh = schlick_fresnel(i_dot_h);
@@ -199,7 +163,7 @@ public:
         f32 fr = mix(0.04f, 1.0f, fh);
         f32 gr = smith_ggx(i_dot_n, 0.25f) * smith_ggx(o_dot_n, 0.25f);
 
-        return (defaults<f32>::inv_pi * mix(fd, ss, _subsurface) * _base_color + fsheen) * (1.0f - _metalic)
+        return (defaults<f32>::inv_pi * mix(fd, ss, _subsurface) * base_color + fsheen) * (1.0f - _metalic)
             + gs * ds * fs
             + 0.25f * _clearcoat * gr * fr * dr;
     }

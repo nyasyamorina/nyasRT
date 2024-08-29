@@ -228,9 +228,8 @@ public:
 
     template<class U> CONST_FUNC vec3 & reflect(vec3<U> const& NORMALIZED n) noexcept
     {
-        auto a = x * n.x + y * n.y + z * n.z;
-        constexpr decltype(a) two = static_cast<decltype(a)>(2);
-        x -= two * a * n.x; y -= two * a * n.y; z -= two * a * n.z;
+        auto a = x * n.x + y * n.y + z * n.z; a *= 2;
+        x -= a * n.x; y -= a * n.y; z -= a * n.z;
         return *this;
     }
 
@@ -703,4 +702,13 @@ template<class T> CONST_FUNC vec3<T> min(vec3<T> const& v1, vec3<T> const& v2) n
 template<class T> CONST_FUNC vec3<T> max(vec3<T> const& v1, vec3<T> const& v2) noexcept
 {
     return vec3(std::max(v1.x, v2.x), std::max(v1.y, v2.y), std::max(v1.z, v2.z));
+}
+
+template<class T> CONST_FUNC T minimum(vec3<T> const& v) noexcept
+{
+    return std::min(std::min(v.x, v.y), v.z);
+}
+template<class T> CONST_FUNC T maximum(vec3<T> const& v) noexcept
+{
+    return std::max(std::max(v.x, v.y), v.z);
 }

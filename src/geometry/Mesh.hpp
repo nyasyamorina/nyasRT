@@ -30,22 +30,23 @@ class Triangle
 {
 public:
 
-    vec3g vertex, side1, side2, normal;
+    vec3g vertex, side1, side2, face_normal, vertexA_normal, vertexB_normal, vertexC_normal;
     fg s11, s12, s22;
 
     CONST_FUNC Triangle() noexcept
-    : vertex{defaults<vec3g>::O}, side1{defaults<vec3g>::X}, side2{defaults<vec3g>::Y}, normal{defaults<vec3g>::Z}
-    , s11{1}, s12{0}, s22{1} {}
+    : vertex{defaults<vec3g>::O}, side1{defaults<vec3g>::X}, side2{defaults<vec3g>::Y}, face_normal{defaults<vec3g>::Z}
+    , vertexA_normal{face_normal}, vertexB_normal{face_normal}, vertexC_normal{face_normal}, s11{1}, s12{0}, s22{1} {}
     CONST_FUNC Triangle(vec3g const& A, vec3g const& B, vec3g const& C) noexcept
-    : vertex{A}, side1{B - A}, side2{C - A}, normal{cross(side1, side2).normalize()}
+    : vertex{A}, side1{B - A}, side2{C - A}, face_normal{cross(side1, side2).normalize()}
+    , vertexA_normal{face_normal}, vertexB_normal{face_normal}, vertexC_normal{face_normal}
     , s11{length2(side1)}, s12{dot(side1, side2)}, s22(length2(side2)) {
-        fg det = s11 * s22 - s12 * s12;
-        s11 /= det; s12 /= det; s22 /= det;
+        fg inv_det = 1 / (s11 * s22 - s12 * s12);
+        s11 *= inv_det; s12 *= inv_det; s22 *= inv_det;
     }
 
     CONST_FUNC vec3g center() const noexcept
     {
-        return (side1 + side2).mul(defaults<fg>::half).add(vertex);
+        return (side1 + side2).mul(defaults<fg>::third).add(vertex);
     }
     CONST_FUNC fg area() const noexcept
     {
@@ -54,21 +55,24 @@ public:
 
     bool trace(Ray const& ray, TraceRecord & rec) const noexcept
     {
+        fg d_dot_n = dot(ray.direction, face_normal);
         // triangle cannot be seen from behind, may be deprecated this line
-        if (dot(ray.direction, normal) >= 0) { return false; }
+        if (d_dot_n >= 0) { return false; }
 
-        fg hit_time = dot(vertex - ray.origin, normal) / dot(ray.direction, normal);
+        fg hit_time = dot(vertex - ray.origin, face_normal) / d_dot_n;
         if ((hit_time < defaults<fg>::eps) || (hit_time >= rec.max_ray_time)) { return false; }
 
         vec3g hit_point = ray.at(hit_time);
         vec3g coord_point = hit_point - vertex;
         fg     co_u = dot(coord_point, side1),     co_v = dot(coord_point, side2);
         fg contra_u = co_u * s22 - co_v * s12, contra_v = co_v * s11 - co_u * s12;
-        if ((contra_u <= 0) || (contra_v <= 0) || (contra_u + contra_v >= 1)) { return false; }
+        fg contra_w = 1 - contra_u - contra_v;
+        if ((contra_u <= 0) || (contra_v <= 0) || (contra_w <= 0)) { return false; }
 
         rec.max_ray_time = hit_time;
         rec.hit_point = hit_point;
-        rec.normal = normal;
+        rec.face_normal = face_normal;
+        rec.interpolated_normal = contra_u * vertexB_normal + contra_v * vertexC_normal + contra_w * vertexA_normal;
         rec.hit_local = vec2g(contra_u, contra_v);
         return true;
     }
@@ -128,13 +132,13 @@ public:
     };
 
 
-    static constexpr u32 max_triangles_per_box = 3;
+    static constexpr u32 max_triangles_per_box = 10;
     static constexpr u32 max_boxes_depth = 32;
-    static constexpr u32 max_strategy_iterations = 16;
+    static constexpr u32 max_strategy_iterations = 32;
 
     enum class DividingStrategy { X, Y, Z };
 
-    void _subdivide()
+    void _build_bounding_volume_hierarchy()
     {
         // pre-calculate some useful informations
         std::vector<std::tuple<vec3g, fg>> trian_infos;
@@ -298,18 +302,31 @@ public:
 
     std::vector<vec3<u32>> faces;
     std::vector<vec3g> vertices;
+    std::vector<vec3g> vertex_normals;
+    bool enable_normal_interpolation;
+    bool custom_vertex_normals;
     bool prepared;
 
     Mesh() noexcept
-    : _triangles{}, _boxes{}, faces{}, vertices{}, prepared{false} {}
+    : _triangles{}, _boxes{}, faces{}, vertices{}, vertex_normals{}
+    , enable_normal_interpolation{false}, custom_vertex_normals{false}, prepared{false} {}
 
 
     bool prepare()
     {
         if (prepared) { return true; }
+        if (enable_normal_interpolation && custom_vertex_normals &&
+            (vertices.size() != vertex_normals.size())) { return false; }
+
+        bool build_vertex_normals = enable_normal_interpolation && !custom_vertex_normals;
+        if (build_vertex_normals)
+        {
+            vertex_normals.resize(vertices.size());
+            for (vec3g & normal : vertex_normals) { normal = defaults<vec3g>::O; }
+        }
 
         _triangles.resize(faces.size());
-        for (u64 index = 0; index < faces.size(); index++)
+        for (u32 index = 0; index < faces.size(); index++)
         {
             vec3<u32> const& face = faces[index];
             if (all(face.isless(vertices.size())))
@@ -317,9 +334,28 @@ public:
                 _triangles[index] = Triangle(vertices[face.x], vertices[face.y], vertices[face.z]);
             }
             else { return false; }
+            if (build_vertex_normals)
+            {
+                vec3g const& face_normal = _triangles[index].face_normal;
+                vertex_normals[face.x] += face_normal;
+                vertex_normals[face.y] += face_normal;
+                vertex_normals[face.z] += face_normal;
+            }
+        }
+        if (enable_normal_interpolation)
+        {
+            for (vec3g & normal : vertex_normals) { normal.normalize(); }
+            for (u32 index = 0; index < faces.size(); index++)
+            {
+                vec3<u32> const& face = faces[index];
+                Triangle & triangle = _triangles[index];
+                triangle.vertexA_normal = vertex_normals[face.x];
+                triangle.vertexB_normal = vertex_normals[face.y];
+                triangle.vertexC_normal = vertex_normals[face.z];
+            }
         }
 
-        _subdivide();
+        _build_bounding_volume_hierarchy();
 
 #ifdef SHOW_TRACE_INFO
         std::cout << "# of triangles: " << _triangles.size() << ", # of boxes: " << _boxes.size() << std::endl;
@@ -481,6 +517,7 @@ public:
     static MeshPtr icosahedron();
 
     static MeshPtr uv_sphere(u32 n_longitude, u32 n_latitude);
+    static MeshPtr torus(fg thickness, u32 n_a, u32 n_b);
 };
 
 
@@ -648,6 +685,45 @@ MeshPtr Mesh::uv_sphere(u32 n_longitude, u32 n_latitude)
         // rectangle when longitude_count = 0
         mesh_p->faces.emplace_back(vertices_index + n_longitude - 1, vertices_index, vertices_index - 1);
         mesh_p->faces.emplace_back(vertices_index, vertices_index - n_longitude, vertices_index - 1);
+    }
+
+    return mesh_p;
+}
+
+MeshPtr Mesh::torus(fg tube_radius, u32 n_a, u32 n_b)
+{
+    MeshPtr mesh_p = std::make_shared<Mesh>();
+    mesh_p->vertices.reserve(n_a * n_b);
+    mesh_p->faces.reserve(n_a * n_b * 2);
+
+    for (u32 b = 0; b < n_b; b++)
+    {
+        fg theta = defaults<fg>::two_pi * b / n_b;
+        fg xx = std::cos(theta), yy = std::sin(theta);
+        for (u32 a = 0; a < n_a; a++)
+        {
+            fg phi = defaults<fg>::two_pi * a / n_a;
+            fg x = tube_radius * std::cos(phi) + 1, z = tube_radius * std::sin(phi);
+            mesh_p->vertices.emplace_back(x * xx, x * yy, z);
+        }
+    }
+
+    mesh_p->faces.emplace_back(0, (n_b - 1) * n_a, n_b * n_a - 1);
+    mesh_p->faces.emplace_back(0, n_b * n_a - 1, n_a - 1);
+    for (u32 a = 1; a < n_a; a++)
+    {
+        mesh_p->faces.emplace_back(a, (n_b - 1) * n_a + a, (n_b - 1) * n_a + a - 1);
+        mesh_p->faces.emplace_back(a, (n_b - 1) * n_a + a - 1, a - 1);
+    }
+    for (u32 b = 1; b < n_b; b++)
+    {
+        mesh_p->faces.emplace_back(b * n_a, (b - 1) * n_a, b * n_a - 1);
+        mesh_p->faces.emplace_back(b * n_a, b * n_a - 1, (b + 1) * n_a - 1);
+        for (u32 a = 1; a < n_a; a++)
+        {
+            mesh_p->faces.emplace_back(b * n_a + a, (b - 1) * n_a + a, (b - 1) * n_a + a - 1);
+            mesh_p->faces.emplace_back(b * n_a + a, (b - 1) * n_a + a - 1, b * n_a + a - 1);
+        }
     }
 
     return mesh_p;

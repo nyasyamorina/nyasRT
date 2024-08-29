@@ -39,6 +39,14 @@ template<class T> CONST_FUNC T sqr(T const& x) noexcept
 {
     return x * x;
 }
+template<class T> CONST_FUNC T cub(T const& x) noexcept
+{
+    return x * x * x;
+}
+template<class T> CONST_FUNC T pow4(T const& x) noexcept
+{
+    return sqr(sqr(x));
+}
 template<class T> CONST_FUNC T pow5(T const& x) noexcept
 {
     return sqr(sqr(x)) * x;
@@ -53,34 +61,36 @@ template<> class defaults<f32>
 {
 public:
 
-    static constexpr f32 half   = 0.5f;
-    static constexpr f32 third  = 1.0f / 3.0f;
-    static constexpr f32 pi     = 3.1415927f;
-    static constexpr f32 two_pi = 2.0f * pi;
-    static constexpr f32 inv_pi = 1.0f / pi;
-    static constexpr f32 eps    = 1e-5f;
+    static constexpr f32 half    = 0.5f;
+    static constexpr f32 third   = 1.0f / 3.0f;
+    static constexpr f32 pi      = 3.1415927f;
+    static constexpr f32 two_pi  = 2.0f * pi;
+    static constexpr f32 inv_pi  = 1.0f / pi;
+    static constexpr f32 half_pi = half * pi;
+    static constexpr f32 eps     = 1e-5f;
 };
 template<> class defaults<f64>
 {
 public:
 
-    static constexpr f64 half   = 0.5;
-    static constexpr f64 third  = 1.0 / 3.0;
-    static constexpr f64 pi     = 3.141592653589793;
-    static constexpr f64 two_pi = 2.0 * pi;
-    static constexpr f64 inv_pi = 1.0 / pi;
-    static constexpr f64 eps    = 1e-8;
+    static constexpr f64 half    = 0.5;
+    static constexpr f64 third   = 1.0 / 3.0;
+    static constexpr f64 pi      = 3.141592653589793;
+    static constexpr f64 two_pi  = 2.0 * pi;
+    static constexpr f64 inv_pi  = 1.0 / pi;
+    static constexpr f64 half_pi = half * pi;
+    static constexpr f64 eps     = 1e-8;
 };
 
 
 /********** degree <--> radian **********/
 
-template<class FP> CONST_FUNC FP rad2deg(FP rad) noexcept
+template<class FP = f64> CONST_FUNC FP rad2deg(FP rad) noexcept
 {
     constexpr FP a = 180 / defaults<FP>::pi;
     return a * rad;
 }
-template<class FP> CONST_FUNC FP deg2rad(FP deg) noexcept
+template<class FP = f64> CONST_FUNC FP deg2rad(FP deg) noexcept
 {
     constexpr FP a = defaults<FP>::pi / 180;
     return a * deg;

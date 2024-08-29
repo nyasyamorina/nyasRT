@@ -88,6 +88,8 @@ protected:
     };
 
 
+    static constexpr RGB trace_info_scaler = RGB(2000, 2000, 10);
+
     Scence const& _scence;
 
 public:
@@ -129,12 +131,15 @@ public:
 
             if ((bounds < config.max_ray_bounds) && rec.hit_object())
             {
+                // get surface texture color
+                RGB surface_color = (*rec.object_p->texture_p)(ray, rec);
+
                 // next bounds direction
-                vec3g incoming = -ray.direction;
-                auto [outgoing, reflected] = rec.object_p->brdf_p->bounds(incoming, rec.normal);
+                rec.interpolated_normal.normalize();
+                auto [outgoing, reflected] = rec.object_p->brdf_p->bounds(surface_color, ray, rec);
 
                 // render object surface
-                rec.ray_color += rec.reflect_color * rec.object_p->brdf_p->emitted(incoming, rec.normal);
+                rec.ray_color += rec.reflect_color * rec.object_p->brdf_p->emitted(surface_color, ray, rec);
                 rec.reflect_color *= reflected;
 
                 // ray bounds
@@ -150,7 +155,6 @@ public:
                     rec.ray_color += rec.reflect_color * _scence.sky_ref()(ray.direction);
                 }
 #ifdef SHOW_TRACE_INFO
-                constexpr RGB trace_info_scaler = RGB(1000, 1000, 10);
                 rec.ray_color = RGB(rec.box_count, rec.triangle_count, bounds).div(trace_info_scaler);
 #endif
                 break;

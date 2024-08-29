@@ -9,6 +9,7 @@
 #include "geometry/Mesh.hpp"
 #include "geometry/Transform.hpp"
 #include "BRDFs/BRDF.hpp"
+#include "textures/Texture.hpp"
 
 
 class Object3D
@@ -17,18 +18,19 @@ public:
 
     MeshPtr mesh_p;
     Transform transform;
+    TexturePtr texture_p;
     BRDFPtr brdf_p;
 
     Object3D() noexcept
-    : mesh_p{nullptr}, transform{}, brdf_p{nullptr} {}
-    Object3D(MeshPtr mesh, BRDFPtr brdf) noexcept
-    : mesh_p{mesh}, transform{}, brdf_p(brdf) {}
+    : mesh_p{nullptr}, transform{}, texture_p{nullptr}, brdf_p{nullptr} {}
+    Object3D(MeshPtr mesh, TexturePtr texture, BRDFPtr brdf) noexcept
+    : mesh_p{mesh}, transform{}, texture_p{texture}, brdf_p{brdf} {}
 
 
     bool prepare()
     {
-        if ((mesh_p == nullptr) || (brdf_p == nullptr)) { return false; }
-        return mesh_p->prepare() && brdf_p->prepare();
+        if ((mesh_p == nullptr) || (texture_p == nullptr) || (brdf_p == nullptr)) { return false; }
+        return mesh_p->prepare() && texture_p->prepare() && brdf_p->prepare();
     }
 
 
@@ -38,7 +40,8 @@ public:
         if (mesh_p->trace(model_ray, rec))
         {
             rec.hit_point = transform.apply_point(rec.hit_point);
-            rec.normal = transform.apply_normal(rec.normal);
+            rec.face_normal = transform.apply_normal(rec.face_normal);
+            rec.interpolated_normal = transform.apply_normal(rec.interpolated_normal);
             rec.object_p = this;
             return true;
         }
