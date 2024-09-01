@@ -54,15 +54,15 @@ public:
         }
 
         // sample on upper hemisphere with distribution `dΩ = cosθ*dθdφ`
-        vec3g outgoing = rec.interpolated_normal + Sampler::sphere(random.uniform01<vec2g>());
+        vec3g outgoing = rec.hit_normal + Sampler::sphere(random.uniform01<vec2g>());
         RGB surface_color = defaults<RGB>::White;
         // normalize
         if (fg lo = length(outgoing); lo >= defaults<fg>::eps) { outgoing *= 1 / lo; }
-        else { outgoing = rec.interpolated_normal; }
+        else { outgoing = rec.hit_normal; }
 
         if (random.uniform01<f32>() > 0.25f * _clearcoat)
         {
-            vec3g prefect_reflection = reflect(ray.direction, rec.interpolated_normal);
+            vec3g prefect_reflection = reflect(ray.direction, rec.hit_normal);
             outgoing = normalize(mix(prefect_reflection, outgoing, _roughness));
             surface_color = base_color;
         }

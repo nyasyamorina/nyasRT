@@ -33,7 +33,7 @@ public:
 
     RGB ray_color, reflect_color;
     fg max_ray_time;
-    vec3g hit_point, face_normal, interpolated_normal;
+    vec3g hit_point, face_normal, hit_normal;
     vec2g hit_local;
     Object3D const* object_p;
 #ifdef SHOW_TRACE_INFO

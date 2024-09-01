@@ -135,7 +135,7 @@ public:
                 RGB surface_color = (*rec.object_p->texture_p)(ray, rec);
 
                 // next bounds direction
-                rec.interpolated_normal.normalize();
+                rec.hit_normal.normalize();
                 auto [outgoing, reflected] = rec.object_p->brdf_p->bounds(surface_color, ray, rec);
 
                 // render object surface

@@ -27,12 +27,12 @@ public:
         {
             return {ray.direction, defaults<RGB>::White};   // surface cannot be seen from behind
         }
-        vec3g outgoing = rec.interpolated_normal + Sampler::sphere(random.uniform01<vec2g>());
+        vec3g outgoing = rec.hit_normal + Sampler::sphere(random.uniform01<vec2g>());
         if (fg lo = length(outgoing); lo >= defaults<fg>::eps) { outgoing *= 1 / lo; }
-        else { outgoing = rec.interpolated_normal; }
+        else { outgoing = rec.hit_normal; }
 
         //if (dot(outgoing, rec.face_normal) < 0) { outgoing.reflect(rec.face_normal); }
-        return {outgoing, (*this)(base_color, -ray.direction, outgoing, rec.interpolated_normal)};
+        return {outgoing, (*this)(base_color, -ray.direction, outgoing, rec.hit_normal)};
     }
 
     virtual CONST_FUNC RGB emitted(RGB const& base_color, Ray const& ray, TraceRecord const& rec) const noexcept

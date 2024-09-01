@@ -41,7 +41,7 @@ public:
         {
             rec.hit_point = transform.apply_point(rec.hit_point);
             rec.face_normal = transform.apply_normal(rec.face_normal);
-            rec.interpolated_normal = transform.apply_normal(rec.interpolated_normal);
+            rec.hit_normal = transform.apply_normal(rec.hit_normal);
             rec.object_p = this;
             return true;
         }

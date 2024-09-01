@@ -21,67 +21,11 @@ using MeshPtr = std::shared_ptr<Mesh>;
 using MeshConstPtr = std::shared_ptr<Mesh const>;
 
 
-// a triangle is made of 3 points A-B-C:
-// the `normal` of triangle and the rotation order A->B->C->A satisfy the right-handed rule;
-// the `vertex` is equal to A, for indicating the space position of the triangle;
-// the `side1` is B-A and the `side2` is C-A;
-// `s11`, `s12`, `s22` are pre-calculate constants.
-class Triangle
-{
-public:
-
-    vec3g vertex, side1, side2, face_normal, vertexA_normal, vertexB_normal, vertexC_normal;
-    fg s11, s12, s22;
-
-    CONST_FUNC Triangle() noexcept
-    : vertex{defaults<vec3g>::O}, side1{defaults<vec3g>::X}, side2{defaults<vec3g>::Y}, face_normal{defaults<vec3g>::Z}
-    , vertexA_normal{face_normal}, vertexB_normal{face_normal}, vertexC_normal{face_normal}, s11{1}, s12{0}, s22{1} {}
-    CONST_FUNC Triangle(vec3g const& A, vec3g const& B, vec3g const& C) noexcept
-    : vertex{A}, side1{B - A}, side2{C - A}, face_normal{cross(side1, side2).normalize()}
-    , vertexA_normal{face_normal}, vertexB_normal{face_normal}, vertexC_normal{face_normal}
-    , s11{length2(side1)}, s12{dot(side1, side2)}, s22(length2(side2)) {
-        fg inv_det = 1 / (s11 * s22 - s12 * s12);
-        s11 *= inv_det; s12 *= inv_det; s22 *= inv_det;
-    }
-
-    CONST_FUNC vec3g center() const noexcept
-    {
-        return (side1 + side2).mul(defaults<fg>::third).add(vertex);
-    }
-    CONST_FUNC fg area() const noexcept
-    {
-        return defaults<fg>::half * length(cross(side1, side2));
-    }
-
-    bool trace(Ray const& ray, TraceRecord & rec) const noexcept
-    {
-        fg d_dot_n = dot(ray.direction, face_normal);
-        // triangle cannot be seen from behind, may be deprecated this line
-        if (d_dot_n >= 0) { return false; }
-
-        fg hit_time = dot(vertex - ray.origin, face_normal) / d_dot_n;
-        if ((hit_time < defaults<fg>::eps) || (hit_time >= rec.max_ray_time)) { return false; }
-
-        vec3g hit_point = ray.at(hit_time);
-        vec3g coord_point = hit_point - vertex;
-        fg     co_u = dot(coord_point, side1),     co_v = dot(coord_point, side2);
-        fg contra_u = co_u * s22 - co_v * s12, contra_v = co_v * s11 - co_u * s12;
-        fg contra_w = 1 - contra_u - contra_v;
-        if ((contra_u <= 0) || (contra_v <= 0) || (contra_w <= 0)) { return false; }
-
-        rec.max_ray_time = hit_time;
-        rec.hit_point = hit_point;
-        rec.face_normal = face_normal;
-        rec.interpolated_normal = contra_u * vertexB_normal + contra_v * vertexC_normal + contra_w * vertexA_normal;
-        rec.hit_local = vec2g(contra_u, contra_v);
-        return true;
-    }
-};
-
-
 class Mesh
 {
-public:
+    using indices = vec3<u32>;
+
+protected:
 
     class BoxNode
     {
@@ -95,15 +39,15 @@ public:
 
         CONST_FUNC BoxNode() noexcept
         : box{}, index_l{0}, index_r{0} {}
-        CONST_FUNC BoxNode(std::vector<vec3g> const& vertices, std::vector<vec3<u32>> const& faces, u32 face_start, u32 n_faces) noexcept
+        CONST_FUNC BoxNode(std::vector<vec3g> const& vertices, std::vector<indices> const& faces, u32 face_start, u32 n_faces) noexcept
         : box{}, index_l{face_start}, index_r{n_faces | leafbit} {
-            vec3<u32> const* face_p = &faces[face_start];
-            vec3<u32> const* stop = face_p + n_faces;
-            for (; face_p < stop; face_p++)
+            indices const* vertex_indices_p = &faces[face_start];
+            indices const* stop = vertex_indices_p + n_faces;
+            for (; vertex_indices_p < stop; vertex_indices_p++)
             {
-                box.bound(vertices[face_p->x]);
-                box.bound(vertices[face_p->y]);
-                box.bound(vertices[face_p->z]);
+                box.bound(vertices[vertex_indices_p->x]);
+                box.bound(vertices[vertex_indices_p->y]);
+                box.bound(vertices[vertex_indices_p->z]);
             }
             box.prepare();
         }
@@ -141,11 +85,21 @@ public:
     void _build_bounding_volume_hierarchy()
     {
         // pre-calculate some useful informations
-        std::vector<std::tuple<vec3g, fg>> trian_infos;
-        trian_infos.reserve(_triangles.size());
-        for (Triangle const& triangle : _triangles)
+        std::vector<std::tuple<vec3g, fg>> center_areas;
+        center_areas.reserve(faces.size());
+        for (u32 face_index = 0; face_index < faces.size(); face_index++)
         {
-            trian_infos.emplace_back(triangle.center(), triangle.area());
+            indices const& vertex_indices = faces[face_index];
+
+            vec3g const& A = vertices[vertex_indices.x];
+            vec3g const& B = vertices[vertex_indices.y];
+            vec3g const& C = vertices[vertex_indices.z];
+
+            // old, correct behavior: ((B - A) + (C - A)).mul(defaults<fg>::third).add(A)
+            vec3g center = defaults<fg>::third * (A + B + C);
+            fg area = defaults<fg>::half * length(cross(B - A, C - A));
+
+            center_areas.emplace_back(center, area);
         }
 
         _boxes.clear();
@@ -181,7 +135,7 @@ public:
                     left_area = right_area = 0;
                     for (u32 index = face_start; index < face_stop; index++)
                     {
-                        std::tuple<vec3g, fg> const& info = trian_infos[index];
+                        auto const& info = center_areas[index];
                         fg tmp = std::get<0>(info).x - divide_line;
                         min_distance = std::min(min_distance, std::abs(tmp));
                         if (tmp <= 0) { left_area += std::get<1>(info); }
@@ -202,7 +156,7 @@ public:
                     l_a = r_a = 0;
                     for (u32 index = face_start; index < face_stop; index++)
                     {
-                        std::tuple<vec3g, fg> const& info = trian_infos[index];
+                        auto const& info = center_areas[index];
                         fg tmp = std::get<0>(info).y - d_l;
                         min_distance = std::min(min_distance, std::abs(tmp));
                         if (tmp <= 0) { l_a += std::get<1>(info); }
@@ -230,7 +184,7 @@ public:
                     l_a = r_a = 0;
                     for (u32 index = face_start; index < face_stop; index++)
                     {
-                        std::tuple<vec3g, fg> const& info = trian_infos[index];
+                        auto const& info = center_areas[index];
                         fg tmp = std::get<0>(info).z - d_l;
                         min_distance = std::min(min_distance, std::abs(tmp));
                         if (tmp <= 0) { l_a += std::get<1>(info); }
@@ -264,22 +218,23 @@ public:
 
                     constexpr u32 invalid_index = std::numeric_limits<u32>::max();
                     // swap triangles to left part and right part
-                    u32 index_right_start = invalid_index;
+                    u32 right_start = invalid_index;
                     for (u32 index = face_start; index < face_stop; index++)
                     {
-                        if (strategy_axis(std::get<0>(trian_infos[index])) <= divide_line)
+                        if (strategy_axis(std::get<0>(center_areas[index])) <= divide_line)
                         {
-                            if (index_right_start != invalid_index)
+                            if (right_start != invalid_index)
                             {
-                                std::swap(      faces[index_right_start],       faces[index]);
-                                std::swap( _triangles[index_right_start],  _triangles[index]);
-                                std::swap(trian_infos[index_right_start], trian_infos[index]);
-                                index_right_start++;
+                                std::swap(          faces[right_start],           faces[index]);
+                                std::swap(  _face_normals[right_start],   _face_normals[index]);
+                                std::swap(_pre_calculated[right_start], _pre_calculated[index]);
+                                std::swap(   center_areas[right_start],    center_areas[index]);
+                                right_start++;
                             }
                         }
-                        else if (index_right_start == invalid_index)
+                        else if (right_start == invalid_index)
                         {
-                            index_right_start = index;
+                            right_start = index;
                         }
                     }
 
@@ -288,35 +243,35 @@ public:
                     box_node.index_r = box_count++;
                     boxes_depth.emplace_back(box_depth + 1);
                     boxes_depth.emplace_back(box_depth + 1);
-                    _boxes.emplace_back(vertices, faces, face_start, index_right_start - face_start);
-                    _boxes.emplace_back(vertices, faces, index_right_start, face_stop - index_right_start);
+                    _boxes.emplace_back(vertices, faces, face_start, right_start - face_start);
+                    _boxes.emplace_back(vertices, faces, right_start, face_stop - right_start);
                 }
             }
         }
     }
 
-    std::vector<Triangle> _triangles;
     std::vector<BoxNode> _boxes;
+    std::vector<vec3g> _face_normals;
+    std::vector<vec3g> _pre_calculated;
 
 public:
 
-    std::vector<vec3<u32>> faces;
+    std::vector<indices> faces;
     std::vector<vec3g> vertices;
     std::vector<vec3g> vertex_normals;
     bool enable_normal_interpolation;
-    bool custom_vertex_normals;
+    bool custom_vertex_normals; // if true, `vertex_normals` must be set by user, otherwise the behavior is undefined
     bool prepared;
 
     Mesh() noexcept
-    : _triangles{}, _boxes{}, faces{}, vertices{}, vertex_normals{}
-    , enable_normal_interpolation{false}, custom_vertex_normals{false}, prepared{false} {}
+    :  enable_normal_interpolation{false}, custom_vertex_normals{false}, prepared{false} {}
 
 
     bool prepare()
     {
         if (prepared) { return true; }
         if (enable_normal_interpolation && custom_vertex_normals &&
-            (vertices.size() != vertex_normals.size())) { return false; }
+            (vertices.size() > vertex_normals.size())) { return false; }
 
         bool build_vertex_normals = enable_normal_interpolation && !custom_vertex_normals;
         if (build_vertex_normals)
@@ -325,40 +280,45 @@ public:
             for (vec3g & normal : vertex_normals) { normal = defaults<vec3g>::O; }
         }
 
-        _triangles.resize(faces.size());
-        for (u32 index = 0; index < faces.size(); index++)
+        _face_normals.resize(faces.size()); _pre_calculated.resize(faces.size());
+        for (u32 face_index = 0; face_index < faces.size(); face_index++)
         {
-            vec3<u32> const& face = faces[index];
-            if (all(face.isless(vertices.size())))
+            indices const& vertex_indices = faces[face_index];
+            vec3g & face_normal = _face_normals[face_index];
+            vec3g & face_constants = _pre_calculated[face_index];
+
+            // calculate face normal and some canstants
+            if (all(vertex_indices.isless(vertices.size())))
             {
-                _triangles[index] = Triangle(vertices[face.x], vertices[face.y], vertices[face.z]);
+                vec3g const& A = vertices[vertex_indices.x];
+                vec3g const& B = vertices[vertex_indices.y];
+                vec3g const& C = vertices[vertex_indices.z];
+
+                face_normal = normalize(cross(B - A, C - A));
+
+                face_constants.x = length2(B - A);
+                face_constants.y = dot(B - A, C - A);
+                face_constants.z = length2(C - A);
+                fg inv_det = 1 / (face_constants.x * face_constants.z - sqr(face_constants.y));
+                face_constants *= inv_det;
             }
-            else { return false; }
+            else { return false; }      // vertex index out of range
             if (build_vertex_normals)
             {
-                vec3g const& face_normal = _triangles[index].face_normal;
-                vertex_normals[face.x] += face_normal;
-                vertex_normals[face.y] += face_normal;
-                vertex_normals[face.z] += face_normal;
+                vertex_normals[vertex_indices.x] += face_normal;
+                vertex_normals[vertex_indices.y] += face_normal;
+                vertex_normals[vertex_indices.z] += face_normal;
             }
         }
         if (enable_normal_interpolation)
         {
             for (vec3g & normal : vertex_normals) { normal.normalize(); }
-            for (u32 index = 0; index < faces.size(); index++)
-            {
-                vec3<u32> const& face = faces[index];
-                Triangle & triangle = _triangles[index];
-                triangle.vertexA_normal = vertex_normals[face.x];
-                triangle.vertexB_normal = vertex_normals[face.y];
-                triangle.vertexC_normal = vertex_normals[face.z];
-            }
         }
 
         _build_bounding_volume_hierarchy();
 
 #ifdef SHOW_TRACE_INFO
-        std::cout << "# of triangles: " << _triangles.size() << ", # of boxes: " << _boxes.size() << std::endl;
+        std::cout << "# of triangles: " << faces.size() << ", # of boxes: " << _boxes.size() << std::endl;
 #endif
 
         return prepared = true;
@@ -389,11 +349,11 @@ public:
         new_faces.reserve(faces.size() * sqr(subdivision));
 
         u32 vertex_index = 0;
-        for (vec3<u32> const& face : faces)
+        for (indices const& vertex_indices : faces)
         {
-            vec3g const& A = vertices[face.x];
-            vec3g const& B = vertices[face.y];
-            vec3g const& C = vertices[face.z];
+            vec3g const& A = vertices[vertex_indices.x];
+            vec3g const& B = vertices[vertex_indices.y];
+            vec3g const& C = vertices[vertex_indices.z];
             vec3g ACn = (C - A) / subdivision;
             vec3g CBn = (B - C) / subdivision;
 
@@ -431,6 +391,45 @@ public:
 
     /******** trace ray ********/
 
+    bool trace_face(u32 face_index, Ray const& ray, TraceRecord & rec)  const noexcept
+    {
+        indices const& vertex_indices = faces[face_index];
+        vec3g const& face_normal = _face_normals[face_index];
+        vec3g const& face_constants = _pre_calculated[face_index];
+        vec3g const& A = vertices[vertex_indices.x];
+        vec3g const& B = vertices[vertex_indices.y];
+        vec3g const& C = vertices[vertex_indices.z];
+
+        fg d_dot_n = dot(ray.direction, face_normal);
+        // triangle cannot be seen from behind, may be deprecated this line
+        if (d_dot_n >= 0) { return false; }
+
+        fg hit_time = dot(A - ray.origin, face_normal) / d_dot_n;
+        if ((hit_time < defaults<fg>::eps) || (hit_time >= rec.max_ray_time)) { return false; }
+
+        vec3g hit_point = ray.at(hit_time);
+        vec3g coord_point = hit_point - A;
+        fg co_u = dot(coord_point, B - A), co_v = dot(coord_point, C - A);
+        fg contra_u = co_u * face_constants.z - co_v * face_constants.y;
+        fg contra_v = co_v * face_constants.x - co_u * face_constants.y;
+        fg contra_w = 1 - contra_u - contra_v;
+        if ((contra_u <= 0) || (contra_v <= 0) || (contra_w <= 0)) { return false; }
+
+        rec.max_ray_time = hit_time;
+        rec.hit_point = hit_point;
+        rec.face_normal = face_normal;
+        rec.hit_normal = face_normal;
+        rec.hit_local = vec2g(contra_u, contra_v);
+        if (enable_normal_interpolation)
+        {
+            vec3g const& An = vertex_normals[vertex_indices.x];
+            vec3g const& Bn = vertex_normals[vertex_indices.y];
+            vec3g const& Cn = vertex_normals[vertex_indices.z];
+            rec.hit_normal = contra_w * An + contra_u * Bn + contra_v * Cn;
+        }
+        return true;
+    }
+
     bool trace(Ray const& ray, TraceRecord & rec) const noexcept
     {
         bool hit = false;
@@ -443,7 +442,7 @@ public:
         using StackEltype = std::tuple<BoxNode const* /* box */, fg /* time_in */>;
         StackEltype to_trace_boxes[max_boxes_depth + 1];
         StackEltype * box_p = to_trace_boxes;
-        *box_p = {_boxes.data(), time_in};
+        *box_p = {&_boxes.front(), time_in};
 
         while (box_p >= to_trace_boxes)
         {
@@ -454,11 +453,10 @@ public:
 
             if (box_node.isleaf())
             {
-                Triangle const* triangle_p = &_triangles[box_node.triangle_start()];
-                Triangle const* stop = triangle_p + box_node.triangles_length();
-                for (; triangle_p < stop; triangle_p++)
+                u32 stop = box_node.triangle_start() + box_node.triangles_length();
+                for (u32 face_index = box_node.triangle_start(); face_index < stop; face_index++)
                 {
-                    hit |= triangle_p->trace(ray, rec);
+                    hit |= trace_face(face_index, ray, rec);
 #ifdef SHOW_TRACE_INFO
                     rec.triangle_count++;
 #endif
@@ -548,7 +546,7 @@ MeshPtr Mesh::load_obj(std::ifstream & file)
             line_buff >> part; indeces.z = s2n<u32>(part);
             // TODO: support many indces `.../.../...`
             // TODO: slpit polygon to triangles
-            mesh_p->faces.push_back(indeces -= 1);
+            mesh_p->faces.push_back(indeces - 1);
         }
     }
 

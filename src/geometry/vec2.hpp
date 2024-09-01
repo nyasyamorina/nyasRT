@@ -79,8 +79,8 @@ public:
     CONST_FUNC vec2 & normalize() noexcept
     {
         static_assert(std::is_floating_point_v<T>, "`normalize` must done in fp vectors.");
-        T n = std::sqrt(x * x + y * y);
-        (*this) /= n;
+        T n = 1 / std::sqrt(x * x + y * y);
+        (*this) *= n;
         return *this;
     }
     // normalize vector and return this length before normalized.
@@ -333,8 +333,8 @@ template<class T> CONST_FUNC T length(vec2<T> const& v) noexcept
 template<class T> CONST_FUNC vec2<T> normalize(vec2<T> const& v) noexcept
 {
     static_assert(std::is_floating_point_v<T>, "`normalize` must done in fp vectors.");
-    T n = length(v);
-    return vec2(v.x / n, v.y / n);
+    T n = 1 / length(v);
+    return vec2(v.x * n, v.y * n);
 }
 // normalized vector and the length of input vector
 template<class T> CONST_FUNC std::tuple<vec2<T>, T> normlen(vec2<T> const& v) noexcept
