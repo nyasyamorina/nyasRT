@@ -2,12 +2,12 @@
 
 #include <inttypes.h>
 #include <math.h>
+#include <numeric>
 #include <string>
 #include <type_traits>
 
 
 #define CONST_FUNC constexpr inline
-#define NORMALIZED /* indicate that the vector parameter should be normalized */
 
 
 using i8  = int8_t;
@@ -68,6 +68,7 @@ public:
     static constexpr f32 inv_pi  = 1.0f / pi;
     static constexpr f32 half_pi = half * pi;
     static constexpr f32 eps     = 1e-5f;
+    static constexpr f32 inf     = std::numeric_limits<f32>::max();
 };
 template<> class defaults<f64>
 {
@@ -80,6 +81,7 @@ public:
     static constexpr f64 inv_pi  = 1.0 / pi;
     static constexpr f64 half_pi = half * pi;
     static constexpr f64 eps     = 1e-8;
+    static constexpr f64 inf     = std::numeric_limits<f64>::max();
 };
 
 

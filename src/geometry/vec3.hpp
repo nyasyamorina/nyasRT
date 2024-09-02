@@ -226,7 +226,7 @@ public:
         return n;
     }
 
-    template<class U> CONST_FUNC vec3 & reflect(vec3<U> const& NORMALIZED n) noexcept
+    template<class U> CONST_FUNC vec3 & reflect(vec3<U> const& n) noexcept
     {
         auto a = x * n.x + y * n.y + z * n.z; a *= 2;
         x -= a * n.x; y -= a * n.y; z -= a * n.z;
@@ -451,6 +451,8 @@ public:
 
 // the vector type used in geometry calculations
 using vec3g = vec3<fg>;
+// indicates that this vector should be normalized
+using normal3g = vec3g;
 
 
 /********** default values **********/
@@ -499,7 +501,7 @@ template<class T> CONST_FUNC std::tuple<vec3<T>, T> normlen(vec3<T> const& v) no
     return {vec3(v.x / n, v.y / n, v.z / n), n};
 }
 
-template<class T, class U> vec3<std::common_type_t<T, U>> reflect(vec3<T> const& v, vec3<U> const& NORMALIZED n) noexcept
+template<class T, class U> vec3<std::common_type_t<T, U>> reflect(vec3<T> const& v, vec3<U> const& n) noexcept
 {
     return v - static_cast<std::common_type_t<T, U>>(2) * dot(v, n) * n;
 }

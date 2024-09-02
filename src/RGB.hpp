@@ -31,6 +31,8 @@ CONST_FUNC f32 remove_gamma(f32 x) noexcept
 }
 
 
+class RGB24;
+
 class RGB final
 {
 public:
@@ -43,6 +45,7 @@ public:
     : r(gray), g(gray), b(gray) {}
     CONST_FUNC RGB(f32 r_, f32 g_, f32 b_) noexcept
     : r(r_), g(g_), b(b_) {}
+    CONST_FUNC RGB(RGB24 rgb) noexcept;
     template<class T> CONST_FUNC RGB(vec3<T> const& v) noexcept
     : r(v.x), g(v.y), b(v.z) {}
 
@@ -166,6 +169,10 @@ public:
     static constexpr RGB Green = RGB(0.0f, 1.0f, 0.0f);
     static constexpr RGB Blue  = RGB(0.0f, 0.0f, 1.0f);
     static constexpr RGB White = RGB(1.0f, 1.0f, 1.0f);
+    // linear sRGB -> CIEXYZ
+    static constexpr RGB Rxyz{0.4124, 0.2126, 0.0193}, Gxyz{0.3576, 0.7152, 0.1192}, Bxyz{0.1805, 0.0722, 0.9505};
+    // CIEXYZ -> linear sRGB
+    static constexpr RGB Xrgb{3.24063, -0.968931, 0.0557101}, Yrgb{-1.53721, 1.87576, -0.204021}, Zrgb{-0.498629, 0.0415175, 1.057};
 };
 
 
@@ -307,3 +314,6 @@ public:
         return (*this) == RGB24(c);
     }
 };
+
+CONST_FUNC RGB::RGB(RGB24 rgb) noexcept
+: r(rgb.r / 255.0f), g(rgb.g / 255.0f), b(rgb.b / 255.0f) {}

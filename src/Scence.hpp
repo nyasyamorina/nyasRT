@@ -6,8 +6,10 @@
 
 #include "utils.hpp"
 #include "Object3D.hpp"
+#include "geometry/Ray.hpp"
 #include "cameras/Camera.hpp"
 #include "sky_models/Sky.hpp"
+#include "light_sources/LightSource.hpp"
 
 
 class Scence
@@ -23,6 +25,10 @@ protected:
         if (!has_camera() || (!_camera_p->prepare())) { return false; }
         if (has_sky() && (!_sky_p->prepare())) { return false; }
 
+        for (LightSourcePtr & light_p : light_ps)
+        {
+            if (!light_p->prepare()) { return false; }
+        }
         for (Object3D & object : objects)
         {
             if (!object.prepare()) { return false; }
@@ -32,10 +38,11 @@ protected:
 
 public:
 
+    std::vector<LightSourcePtr> light_ps;
     std::vector<Object3D> objects;
 
     Scence() noexcept
-    : _prepared(false), _camera_p{nullptr}, _sky_p{nullptr}, objects{} {}
+    : _prepared(false), _camera_p{nullptr}, _sky_p{nullptr} {}
 
 
     bool prepare()
@@ -91,6 +98,26 @@ public:
     Sky const& sky_ref() const noexcept
     {
         return *_sky_p;
+    }
+
+
+    bool trace(Ray const& ray, TraceRecord & rec) const noexcept
+    {
+        bool hit = false;
+        for (Object3D const& object : objects)
+        {
+            hit |= object.trace(ray, rec);
+        }
+        return hit;
+    }
+
+    bool test_hit(Ray const& ray, fg max_ray_time) const noexcept
+    {
+        for (Object3D const& object : objects)
+        {
+            if (object.test_hit(ray, max_ray_time)) { return true; }
+        }
+        return false;
     }
 };
 

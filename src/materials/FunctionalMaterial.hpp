@@ -2,18 +2,18 @@
 
 #include <math.h>
 
-#include "Texture.hpp"
+#include "Material.hpp"
 
 
-class FunctionalTexture : public Texture
+class FunctionalMaterial : public Material
 {
 public:
 
     RGB color1, color2;
 
-    FunctionalTexture(RGB const& color1_, RGB const& color2_)
+    FunctionalMaterial(RGB const& color1_, RGB const& color2_)
     : color1{color1_}, color2{color2_} {}
-    virtual ~FunctionalTexture() noexcept = default;
+    virtual ~FunctionalMaterial() noexcept = default;
 
     virtual RGB operator () (Ray const& ray, TraceRecord const& rec) const noexcept override
     {

@@ -150,14 +150,22 @@ public:
     }
 
 
-    /******** save to file ********/
+    /******** save to file & load from file ********/
 
     template<class Saver> bool save(std::filesystem::path const& path) const
     {
-        std::fstream file(path, std::ios::out | std::ios::binary | std::ios::trunc);
+        std::ofstream file(path, std::ios::out | std::ios::binary | std::ios::trunc);
         if (!file.is_open()) { return false; }
-        Saver saver(file);
-        return saver(*this);
+        Saver saver;
+        return saver.write(file, *this);
+    }
+
+    template<class Loader> bool load(std::filesystem::path const& path)
+    {
+        std::ifstream file(path, std::ios::in | std::ios::binary);
+        if (!file.is_open()) { return false; }
+        Loader loader;
+        return loader.read(file, *this);
     }
 };
 
@@ -242,13 +250,25 @@ public:
 };
 
 
-class QOI final
+class ImageFormatter
+{
+public:
+
+    virtual bool write(std::ofstream & file, Figure const& fig) = 0;
+    virtual bool read(std::ifstream & file, Figure & fig) = 0;
+};
+
+class QOI final : ImageFormatter
 {
 private:
 
+    static CONST_FUNC u32 running_index(RGB24 c, u8 alpha) noexcept
+    {
+        return (3 * c.r + 5 * c.g + 7 * c.b + 11 * alpha) & 63;
+    }
     static CONST_FUNC u32 running_index(RGB24 c) noexcept
     {
-        return 3 * c.r + 5 * c.g + 7 * c.b + (11 * 255/*a*/) & 63;
+        return running_index(c, 255);
     }
 
     static CONST_FUNC void diff(RGB24 & d, RGB24 c) noexcept
@@ -274,7 +294,6 @@ private:
     }
 
 
-    std::fstream & file;
     u8 header[14];
     u8 index;
     RGB24 running[64];
@@ -282,8 +301,8 @@ private:
 
 public:
 
-    QOI(std::fstream & file_) noexcept
-    : file(file_), header{}, index{0}, running{}, prev{}, curr{} {
+    QOI() noexcept
+    : header{}, index{0}, running{}, prev{}, curr{} {
         // initialize header
         header[0] = 'q'; header[1] = 'o'; header[2] = 'i'; header[3] = 'f';
         header[12] = 3; header[13] = 1;
@@ -297,13 +316,13 @@ public:
         running[running_index(Black24)] = Green24;
     }
 
-    void write(void const* data, u64 length)
+    virtual bool write(std::ofstream & file, Figure const& fig) override
     {
-        file.write((char *)(data), length);
-    }
+        auto write = [&] (void const* data, u64 length)
+        {
+            file.write(reinterpret_cast<char const*>(data), length);
+        };
 
-    bool operator () (Figure const& fig)
-    {
         // big-endian
         *reinterpret_cast<u32 *>(header + 4) = std::byteswap( fig.width());
         *reinterpret_cast<u32 *>(header + 8) = std::byteswap(fig.height());
@@ -315,7 +334,9 @@ public:
         // although the previous of the first pixel should be RGBA(0),
         // but we don't track the alphas, so the first pixel must be not qual to
         // the previous one, even cannot close to it.
-        prev = RGB24(pix->r + 90, pix->g + 90, pix->b + 90);
+        prev = RGB24(*pix);
+        //prev.r = ~prev.r; prev.g = ~prev.g; prev.b = ~prev.b;
+        prev.r += 90; prev.g += 90; prev.b += 90;
 
         u8 encoded;
         while (pix < end)
@@ -374,6 +395,80 @@ public:
         write(header, sizeof(u64));
 
         file.flush();
+        return true;
+    }
+
+    virtual bool read(std::ifstream & file, Figure & fig) override
+    {
+        auto read = [&] (void * data, u64 length) -> bool
+        {
+            file.read(reinterpret_cast<char *>(data), length);
+            return file.gcount() == length;
+        };
+
+        vec2<u32> fig_size;
+        if (!read(header, 14)) { return false; }
+        fig_size.x = std::byteswap(*reinterpret_cast<u32 *>(header + 4));
+        fig_size.y = std::byteswap(*reinterpret_cast<u32 *>(header + 8));
+        if (!all(fig.size().iseq(fig_size))) { fig = Figure(fig_size); }
+
+        RGB * pix = fig.begin();
+        RGB * end = fig.end();
+
+        prev = RGB24(0, 0, 0);
+        u8 alpha = 0;
+
+        u8 encoded, flag, data;
+        while (pix < end)
+        {
+            if (!read(&encoded, 1)) { return false; }
+            flag = encoded & 0xC0; data = encoded & 0x3F;
+
+            if (flag == 0x00)               // -> QOI_OP_INDEX
+            {
+                curr = running[data];
+                // running with alpha ???
+            }
+            else if (flag == 0x40)          // -> QOI_OP_DIFF
+            {
+                curr.r = prev.r - static_cast<u8>(2) + (data >> 4);
+                curr.g = prev.g - static_cast<u8>(2) + ((data >> 2) & 0x3);
+                curr.b = prev.b - static_cast<u8>(2) + (data & 0x3);
+            }
+            else if (flag == 0x80)          // -> QOI_OP_LUMA
+            {
+                if (!read(&encoded, 1)) { return false; }
+                curr.g = data - static_cast<u8>(32);
+                curr.r = prev.r - static_cast<u8>(8) + curr.g + (encoded >>  4);
+                curr.b = prev.b - static_cast<u8>(8) + curr.g + (encoded & 0xF);
+                curr.g += prev.g;
+            }
+            else
+            {
+                if (encoded == 0xFE)        // -> QOI_OP_RGB
+                {
+                    if (!read(&curr, 3)) { return false; }
+                    alpha = 255;
+                }
+                else if (encoded == 0xFF)   // -> QOI_OP_RGBA
+                {
+                    if (!read(&curr, 3)) { return false; }
+                    if (!read(&alpha, 1)) { return false; }
+                }
+                else                        // -> QOI_OP_RUN
+                {
+                    while ((data--) > 0)
+                    {
+                        *(pix++) = prev;
+                        if (!(pix < end)) { return true; }
+                    }
+                }
+            }
+
+            *(pix++) = curr;
+            index = running_index(curr, alpha);
+            prev = running[index] = curr;
+        }
         return true;
     }
 };

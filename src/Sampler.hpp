@@ -13,8 +13,31 @@ class Sampler final
 {
 public:
 
+    // map [0,1)^2 to unit disk(circle)
+    static CONST_FUNC vec2g disk(vec2g uv) noexcept
+    {
+        uv.mul(2).sub(1);
+        fg r, phi = 0;
+        if (-uv.x > uv.y)
+        {
+            uv *= -1;
+            phi = 4;
+        }
+        if (uv.x > uv.y)
+        {
+            r = uv.x;
+            phi += uv.y / uv.x;
+        }
+        else
+        {
+            r = uv.y;
+            if (uv.y != 0) { phi += 2 - uv.x / uv.y; }
+        }
+        phi *= defaults<fg>::half * defaults<fg>::half_pi;
+        return vec2g(r * std::cos(phi), r * std::sin(phi));
+    }
     // map [0,1)^2 to unit sphere
-    static CONST_FUNC vec3g sphere(vec2g const uv) noexcept
+    static CONST_FUNC normal3g sphere(vec2g const uv) noexcept
     {
         fg phi = 2 * defaults<fg>::two_pi * uv.x;
         fg sphi = std::sin(phi), cphi = std::cos(phi);
@@ -23,7 +46,7 @@ public:
         return vec3g(stheta * cphi, stheta * sphi, ctheta);
     }
     // map [0,1)^2 to unit upper hemisphere, the distribution on solid angle satisfies `dΩ = cosθ*dθdφ`
-    static CONST_FUNC vec3g hemisphere(vec2g const uv) noexcept
+    static CONST_FUNC normal3g hemisphere(vec2g const uv) noexcept
     {
         fg phi = 2 * defaults<fg>::two_pi * uv.x;
         fg sphi = std::sin(phi), cphi = std::cos(phi);

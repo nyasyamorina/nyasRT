@@ -14,7 +14,7 @@ public:
     virtual ~GradientSky() noexcept = default;
 
 
-    virtual RGB operator () (vec3g const& NORMALIZED direction) const noexcept override
+    virtual RGB operator () (normal3g const& direction) const noexcept override
     {
         f32 x = defaults<fg>::half * (direction.z + 1);
         return x * top_color + (1 - x) * bottom_color;

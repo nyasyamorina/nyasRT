@@ -9,7 +9,7 @@
 #include "geometry/Mesh.hpp"
 #include "geometry/Transform.hpp"
 #include "BRDFs/BRDF.hpp"
-#include "textures/Texture.hpp"
+#include "materials/Material.hpp"
 
 
 class Object3D
@@ -18,19 +18,19 @@ public:
 
     MeshPtr mesh_p;
     Transform transform;
-    TexturePtr texture_p;
+    MaterialPtr material_p;
     BRDFPtr brdf_p;
 
     Object3D() noexcept
-    : mesh_p{nullptr}, transform{}, texture_p{nullptr}, brdf_p{nullptr} {}
-    Object3D(MeshPtr mesh, TexturePtr texture, BRDFPtr brdf) noexcept
-    : mesh_p{mesh}, transform{}, texture_p{texture}, brdf_p{brdf} {}
+    : mesh_p{nullptr}, transform{}, material_p{nullptr}, brdf_p{nullptr} {}
+    Object3D(MeshPtr mesh, MaterialPtr material, BRDFPtr brdf) noexcept
+    : mesh_p{mesh}, transform{}, material_p{material}, brdf_p{brdf} {}
 
 
     bool prepare()
     {
-        if ((mesh_p == nullptr) || (texture_p == nullptr) || (brdf_p == nullptr)) { return false; }
-        return mesh_p->prepare() && texture_p->prepare() && brdf_p->prepare();
+        if ((mesh_p == nullptr) || (material_p == nullptr) || (brdf_p == nullptr)) { return false; }
+        return mesh_p->prepare() && material_p->prepare() && brdf_p->prepare();
     }
 
 
@@ -46,6 +46,12 @@ public:
             return true;
         }
         return false;
+    }
+
+    bool test_hit(Ray const& ray, fg max_ray_time) const noexcept
+    {
+        Ray model_ray = transform.undo(ray);
+        return mesh_p->test_hit(model_ray, max_ray_time);
     }
 };
 

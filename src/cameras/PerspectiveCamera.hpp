@@ -5,6 +5,7 @@
 #include "../utils.hpp"
 #include "../geometry/vec3.hpp"
 #include "../geometry/Ray.hpp"
+#include "../geometry/Transform.hpp"
 #include "Camera.hpp"
 
 
@@ -58,17 +59,11 @@ public:
     }
     PerspectiveCamera & view_angle(fg yaw, fg pitch, fg roll) noexcept
     {
-        fg ld = length(_view.direction);
-        fg lh = length(_horizontal);
-        fg lv = length(_vertical);
+        Rotation rot(yaw, pitch, roll);
 
-        fg sy = std::sin(yaw),   cy = std::cos(yaw);
-        fg sp = std::sin(pitch), cp = std::cos(pitch);
-        fg sr = std::sin(roll),  cr = std::cos(roll);
-
-        _view.direction =  ld * vec3g(          cp*cy,          cp*sy,     sp);
-        _horizontal     = -lh * vec3g(-cr*sy-sp*sr*cy,  cr*cy-sp*sr*sy, cp*sr);
-        _vertical       =  lv * vec3g( sr*sy-sp*cr*cy, -sr*cy-sp*cr*sy, cp*cr);
+        _view.direction = length(_view.direction) * rot.apply( defaults<vec3g>::X);
+        _horizontal     = length(_horizontal)     * rot.apply(-defaults<vec3g>::Y);
+        _vertical       = length(_vertical)       * rot.apply( defaults<vec3g>::Z);
 
         return *this;
     }

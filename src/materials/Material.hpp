@@ -8,7 +8,7 @@
 #include "../geometry/Ray.hpp"
 
 
-class Texture
+class Material
 {
 public:
 
@@ -20,5 +20,5 @@ public:
     virtual RGB operator () (Ray const& ray, TraceRecord const& rec) const noexcept = 0;
 };
 
-using TexturePtr = std::shared_ptr<Texture>;
-using TextureConstPtr = std::shared_ptr<Texture const>;
+using MaterialPtr = std::shared_ptr<Material>;
+using MaterialConstPtr = std::shared_ptr<Material const>;

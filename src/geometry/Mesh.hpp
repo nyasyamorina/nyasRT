@@ -13,6 +13,17 @@
 #include "vec3.hpp"
 #include "BoundingBox.hpp"
 #include "Ray.hpp"
+#include "Transform.hpp"
+
+
+class VertexInfo
+{
+public:
+
+    vec3g position;
+    normal3g normal;
+    vec2g texture_coordinate;
+};
 
 
 class Mesh;
@@ -24,6 +35,11 @@ using MeshConstPtr = std::shared_ptr<Mesh const>;
 class Mesh
 {
     using indices = vec3<u32>;
+
+    template<class T> static CONST_FUNC T interpolate(T const* vertex_data, indices const& vertex_indices, vec2g const& uv) noexcept
+    {
+        return (1 - sum(uv)) * vertex_data[vertex_indices.x] + uv.x * vertex_data[vertex_indices.y] + uv.y * vertex_data[vertex_indices.z];
+    }
 
 protected:
 
@@ -39,7 +55,7 @@ protected:
 
         CONST_FUNC BoxNode() noexcept
         : box{}, index_l{0}, index_r{0} {}
-        CONST_FUNC BoxNode(std::vector<vec3g> const& vertices, std::vector<indices> const& faces, u32 face_start, u32 n_faces) noexcept
+        CONST_FUNC BoxNode(vec3g const* vertices, indices const* faces, u32 face_start, u32 n_faces) noexcept
         : box{}, index_l{face_start}, index_r{n_faces | leafbit} {
             indices const* vertex_indices_p = &faces[face_start];
             indices const* stop = vertex_indices_p + n_faces;
@@ -86,14 +102,12 @@ protected:
     {
         // pre-calculate some useful informations
         std::vector<std::tuple<vec3g, fg>> center_areas;
-        center_areas.reserve(faces.size());
-        for (u32 face_index = 0; face_index < faces.size(); face_index++)
+        center_areas.reserve(_faces.size());
+        for (indices vertex_indices : _faces)
         {
-            indices const& vertex_indices = faces[face_index];
-
-            vec3g const& A = vertices[vertex_indices.x];
-            vec3g const& B = vertices[vertex_indices.y];
-            vec3g const& C = vertices[vertex_indices.z];
+            vec3g const& A = _vertices[vertex_indices.x];
+            vec3g const& B = _vertices[vertex_indices.y];
+            vec3g const& C = _vertices[vertex_indices.z];
 
             // old, correct behavior: ((B - A) + (C - A)).mul(defaults<fg>::third).add(A)
             vec3g center = defaults<fg>::third * (A + B + C);
@@ -105,7 +119,7 @@ protected:
         _boxes.clear();
         std::vector<u32> boxes_depth;
         // global box
-        _boxes.emplace_back(vertices, faces, 0, faces.size());
+        _boxes.emplace_back(_vertices.data(), _faces.data(), 0, _faces.size());
         boxes_depth.emplace_back(1);
 
         u32 box_index = 0, box_count = 1;
@@ -129,7 +143,7 @@ protected:
                 for (u32 iter = 0; iter < max_strategy_iterations; iter++)
                 {
                     // set a new dividing line
-                    fg min_distance = std::numeric_limits<fg>::max(), delta = box_size.x / (1 << (iter + 1));
+                    fg min_distance = defaults<fg>::inf, delta = box_size.x / (1 << (iter + 1));
                     divide_line += delta * (left_area > right_area ? -1 : 1);
                     // calculate how many area in each side
                     left_area = right_area = 0;
@@ -150,7 +164,7 @@ protected:
                 for (u32 iter = 0; iter < max_strategy_iterations; iter++)
                 {
                     // set a new dividing line
-                    fg min_distance = std::numeric_limits<fg>::max(), delta = box_size.y / (1 << (iter + 1));
+                    fg min_distance = defaults<fg>::inf, delta = box_size.y / (1 << (iter + 1));
                     d_l += delta * (l_a > r_a ? -1 : 1);
                     // calculate how many area in each side
                     l_a = r_a = 0;
@@ -178,7 +192,7 @@ protected:
                 for (u32 iter = 0; iter < max_strategy_iterations; iter++)
                 {
                     // set a new dividing line
-                    fg min_distance = std::numeric_limits<fg>::max(), delta = box_size.z / (1 << (iter + 1));
+                    fg min_distance = defaults<fg>::inf, delta = box_size.z / (1 << (iter + 1));
                     d_l += delta * (l_a > r_a ? -1 : 1);
                     // calculate how many area in each side
                     l_a = r_a = 0;
@@ -221,14 +235,14 @@ protected:
                     u32 right_start = invalid_index;
                     for (u32 index = face_start; index < face_stop; index++)
                     {
-                        if (strategy_axis(std::get<0>(center_areas[index])) <= divide_line)
+                        if (strategy_axis(std::get<0>(center_areas[index])) < divide_line)
                         {
                             if (right_start != invalid_index)
                             {
-                                std::swap(          faces[right_start],           faces[index]);
-                                std::swap(  _face_normals[right_start],   _face_normals[index]);
-                                std::swap(_pre_calculated[right_start], _pre_calculated[index]);
-                                std::swap(   center_areas[right_start],    center_areas[index]);
+                                std::swap(       _faces[right_start],      _faces[index]);
+                                std::swap(_face_normals[right_start], _face_normals[index]);
+                                std::swap( _face_consts[right_start],  _face_consts[index]);
+                                std::swap( center_areas[right_start],  center_areas[index]);
                                 right_start++;
                             }
                         }
@@ -243,22 +257,23 @@ protected:
                     box_node.index_r = box_count++;
                     boxes_depth.emplace_back(box_depth + 1);
                     boxes_depth.emplace_back(box_depth + 1);
-                    _boxes.emplace_back(vertices, faces, face_start, right_start - face_start);
-                    _boxes.emplace_back(vertices, faces, right_start, face_stop - right_start);
+                    _boxes.emplace_back(_vertices.data(), _faces.data(), face_start, right_start - face_start);
+                    _boxes.emplace_back(_vertices.data(), _faces.data(), right_start, face_stop - right_start);
                 }
             }
         }
     }
 
     std::vector<BoxNode> _boxes;
-    std::vector<vec3g> _face_normals;
-    std::vector<vec3g> _pre_calculated;
+    std::vector<vec3g> _vertices;
+    std::vector<vec3g> _vertex_normals;
+    std::vector<vec2g> _vertex_uv;  // texture coordinate
+    std::vector<indices>  _faces;
+    std::vector<normal3g> _face_normals;
+    std::vector<vec3g>    _face_consts;
 
 public:
 
-    std::vector<indices> faces;
-    std::vector<vec3g> vertices;
-    std::vector<vec3g> vertex_normals;
     bool enable_normal_interpolation;
     bool custom_vertex_normals; // if true, `vertex_normals` must be set by user, otherwise the behavior is undefined
     bool prepared;
@@ -270,29 +285,25 @@ public:
     bool prepare()
     {
         if (prepared) { return true; }
-        if (enable_normal_interpolation && custom_vertex_normals &&
-            (vertices.size() > vertex_normals.size())) { return false; }
+
+        _face_normals.resize(_faces.size());
+        _face_consts.resize(_faces.size());
 
         bool build_vertex_normals = enable_normal_interpolation && !custom_vertex_normals;
-        if (build_vertex_normals)
-        {
-            vertex_normals.resize(vertices.size());
-            for (vec3g & normal : vertex_normals) { normal = defaults<vec3g>::O; }
-        }
+        if (build_vertex_normals) for (normal3g & normal : _vertex_normals) { normal = defaults<vec3g>::O; }
 
-        _face_normals.resize(faces.size()); _pre_calculated.resize(faces.size());
-        for (u32 face_index = 0; face_index < faces.size(); face_index++)
+        for (u32 face_index = 0; face_index < _faces.size(); face_index++)
         {
-            indices const& vertex_indices = faces[face_index];
-            vec3g & face_normal = _face_normals[face_index];
-            vec3g & face_constants = _pre_calculated[face_index];
+            indices const& vertex_indices = _faces[face_index];
+            normal3g & face_normal = _face_normals[face_index];
+            vec3g & face_constants = _face_consts[face_index];
 
             // calculate face normal and some canstants
-            if (all(vertex_indices.isless(vertices.size())))
+            if (all(vertex_indices.isless(_vertices.size())))
             {
-                vec3g const& A = vertices[vertex_indices.x];
-                vec3g const& B = vertices[vertex_indices.y];
-                vec3g const& C = vertices[vertex_indices.z];
+                vec3g const& A = _vertices[vertex_indices.x];
+                vec3g const& B = _vertices[vertex_indices.y];
+                vec3g const& C = _vertices[vertex_indices.z];
 
                 face_normal = normalize(cross(B - A, C - A));
 
@@ -305,32 +316,102 @@ public:
             else { return false; }      // vertex index out of range
             if (build_vertex_normals)
             {
-                vertex_normals[vertex_indices.x] += face_normal;
-                vertex_normals[vertex_indices.y] += face_normal;
-                vertex_normals[vertex_indices.z] += face_normal;
+                _vertex_normals[vertex_indices.x] += face_normal;
+                _vertex_normals[vertex_indices.y] += face_normal;
+                _vertex_normals[vertex_indices.z] += face_normal;
             }
         }
-        if (enable_normal_interpolation)
-        {
-            for (vec3g & normal : vertex_normals) { normal.normalize(); }
-        }
+        if (enable_normal_interpolation) for (normal3g & normal : _vertex_normals) { normal.normalize(); }
 
         _build_bounding_volume_hierarchy();
 
 #ifdef SHOW_TRACE_INFO
         std::cout << "# of triangles: " << faces.size() << ", # of boxes: " << _boxes.size() << std::endl;
 #endif
-
         return prepared = true;
     }
 
+
+    u32 add_vertex(vec3g const& vertex) noexcept
+    {
+        _vertices      .push_back(vertex);
+        _vertex_normals.push_back(defaults<vec3g>::Z);
+        _vertex_uv     .push_back(defaults<vec2g>::O);
+        return _vertices.size() - 1;
+    }
+    u32 add_vertex(VertexInfo const& vertex) noexcept
+    {
+        _vertices      .push_back(vertex.position);
+        _vertex_normals.push_back(vertex.normal);
+        _vertex_uv     .push_back(vertex.texture_coordinate);
+        return _vertices.size() - 1;
+    }
+
+    u32 add_face(u32 A_index, u32 B_index, u32 C_index) noexcept
+    {
+        return add_face(indices(A_index, B_index, C_index));
+    }
+    u32 add_face(indices const& vertex_indices) noexcept
+    {
+        _faces.push_back(vertex_indices);
+        return _faces.size() - 1;
+    }
+
+    Mesh & vertex(u32 index, vec3g const& vertex) noexcept
+    {
+        _vertices[index] = vertex;
+        return *this;
+    }
+    Mesh & vertex(u32 index, VertexInfo const& vertex) noexcept
+    {
+        _vertices      [index] = vertex.position;
+        _vertex_normals[index] = vertex.normal;
+        _vertex_uv     [index] = vertex.texture_coordinate;
+        return *this;
+    }
+
+    Mesh & face(u32 index, u32 A_index, u32 B_index, u32 C_index) noexcept
+    {
+        return face(index, indices(A_index, B_index, C_index));
+    }
+    Mesh & face(u32 index, indices const& vertex_indices) noexcept
+    {
+        _faces[index] = vertex_indices;
+        return *this;
+    }
+
+    Mesh & reserve_vertices(u32 n) noexcept
+    {
+        _vertices      .reserve(n);
+        _vertex_normals.reserve(n);
+        _vertex_uv     .reserve(n);
+        return *this;
+    }
+    Mesh & reserve_faces(u32 n) noexcept
+    {
+        _faces.reserve(n);
+        return *this;
+    }
+
+    VertexInfo vertex(u32 index) const noexcept
+    {
+        VertexInfo info;
+        info.position           = _vertices[index];
+        info.normal             = _vertex_normals[index];
+        info.texture_coordinate = _vertex_uv[index];
+        return info;
+    }
+    indices face(u32 index) const noexcept
+    {
+        return _faces[index];
+    }
 
     /******** mesh trasformations ********/
 
     Mesh & project_to_sphere(fg radius = 1) noexcept
     {
         prepared = false;
-        for (vec3g & vertex : vertices)
+        for (vec3g & vertex : _vertices)
         {
             vertex *= radius / length(vertex);
         }
@@ -343,48 +424,49 @@ public:
         prepared = false;
 
         // TODO: share the new vertices belong the edges
-        decltype(vertices) new_vertices;
-        decltype(faces) new_faces;
-        new_vertices.reserve(faces.size() * (((subdivision + 1) * (subdivision + 2)) >> 1));
-        new_faces.reserve(faces.size() * sqr(subdivision));
+        std::vector<vec3g> new_vertices;
+        std::vector<vec3g> new_vertex_normals;
+        std::vector<vec2g> new_vertex_uv;  // texture coordinate
+        std::vector<indices> new_faces;
+        new_vertices.reserve(_faces.size() * (((subdivision + 1) * (subdivision + 2)) >> 1));
+        new_vertex_normals.reserve(new_vertices.size());
+        new_vertex_uv.reserve(new_vertices.size());
+        new_faces.reserve(_faces.size() * sqr(subdivision));
+        // TODO: vertex normals
 
-        u32 vertex_index = 0;
-        for (indices const& vertex_indices : faces)
+        u32 v_index = 0;
+        for (indices const& vertex_indices : _faces)
         {
-            vec3g const& A = vertices[vertex_indices.x];
-            vec3g const& B = vertices[vertex_indices.y];
-            vec3g const& C = vertices[vertex_indices.z];
-            vec3g ACn = (C - A) / subdivision;
-            vec3g CBn = (B - C) / subdivision;
-
-            vec3g m1 = A;
-            for (u32 u = 0; u <= subdivision; u++)
+            for (u32 v_i = 0; v_i <= subdivision; v_i++)
             {
-                vec3g m2 = m1;
-                for (u32 v = 0; v <= u; v++)
+                for (u32 u_i = 0; u_i <= subdivision - v_i; u_i++)
                 {
-                    new_vertices.push_back(m2);
-                    m2 += CBn;
+                    vec2g uv = vec2g(u_i, v_i) / subdivision;
+                    new_vertices      .push_back(interpolate(_vertices      .data(), vertex_indices, uv));
+                    new_vertex_normals.push_back(interpolate(_vertex_normals.data(), vertex_indices, uv));
+                    new_vertex_uv     .push_back(interpolate(_vertex_uv     .data(), vertex_indices, uv));
                 }
-                m1 += ACn;
             }
 
-            for (u32 u = 0; u < subdivision; u++)
+            for (u32 v_i = 0; v_i < subdivision; v_i++)
             {
-                for (u32 v = 0; v < u; v++)
+                new_faces.emplace_back(v_index, v_index + 1, v_index + (subdivision - v_i));
+                v_index++;
+                for (u32 u_i = 1; u_i < subdivision - v_i; u_i++)
                 {
-                    new_faces.emplace_back(vertex_index, vertex_index + u + 2, vertex_index + u + 1);
-                    new_faces.emplace_back(vertex_index, vertex_index + 1, vertex_index + u + 2);
-                    vertex_index++;
+                    new_faces.emplace_back(v_index, v_index + 1, v_index + (subdivision - v_i));
+                    new_faces.emplace_back(v_index, v_index + (subdivision - v_i), (v_index - 1) + (subdivision - v_i));
+                    v_index++;
                 }
-                new_faces.emplace_back(vertex_index, vertex_index + u + 2, vertex_index + u + 1);
-                vertex_index++;
+                v_index++;
             }
-            vertex_index += subdivision + 1;
+            v_index++;
         }
 
-        vertices.swap(new_vertices);
-        faces.swap(new_faces);
+        _vertices      .swap(new_vertices);
+        _vertex_normals.swap(new_vertex_normals);
+        _vertex_uv     .swap(new_vertex_uv);
+        _faces.swap(new_faces);
         return *this;
     }
 
@@ -393,12 +475,12 @@ public:
 
     bool trace_face(u32 face_index, Ray const& ray, TraceRecord & rec)  const noexcept
     {
-        indices const& vertex_indices = faces[face_index];
-        vec3g const& face_normal = _face_normals[face_index];
-        vec3g const& face_constants = _pre_calculated[face_index];
-        vec3g const& A = vertices[vertex_indices.x];
-        vec3g const& B = vertices[vertex_indices.y];
-        vec3g const& C = vertices[vertex_indices.z];
+        indices const& vertex_indices = _faces[face_index];
+        normal3g const& face_normal = _face_normals[face_index];
+        vec3g const& face_constants = _face_consts[face_index];
+        vec3g const& A = _vertices[vertex_indices.x];
+        vec3g const& B = _vertices[vertex_indices.y];
+        vec3g const& C = _vertices[vertex_indices.z];
 
         fg d_dot_n = dot(ray.direction, face_normal);
         // triangle cannot be seen from behind, may be deprecated this line
@@ -419,31 +501,29 @@ public:
         rec.hit_point = hit_point;
         rec.face_normal = face_normal;
         rec.hit_normal = face_normal;
-        rec.hit_local = vec2g(contra_u, contra_v);
+        rec.hit_face = vec2g(contra_u, contra_v);
+        rec.hit_texture = interpolate(_vertex_uv.data(), vertex_indices, rec.hit_face);
         if (enable_normal_interpolation)
         {
-            vec3g const& An = vertex_normals[vertex_indices.x];
-            vec3g const& Bn = vertex_normals[vertex_indices.y];
-            vec3g const& Cn = vertex_normals[vertex_indices.z];
-            rec.hit_normal = contra_w * An + contra_u * Bn + contra_v * Cn;
+            rec.hit_normal = interpolate(_vertex_normals.data(), vertex_indices, rec.hit_face);
         }
         return true;
     }
 
     bool trace(Ray const& ray, TraceRecord & rec) const noexcept
     {
-        bool hit = false;
         auto [time_in, time_out] = _boxes.front().box.trace(ray);
 #ifdef SHOW_TRACE_INFO
         rec.box_count++;
 #endif
-        if ((time_out < defaults<fg>::eps) || (time_in >= time_out)) { return hit; }
+        if ((time_out < defaults<fg>::eps) || (time_in >= time_out)) { return false; }
 
         using StackEltype = std::tuple<BoxNode const* /* box */, fg /* time_in */>;
         StackEltype to_trace_boxes[max_boxes_depth + 1];
         StackEltype * box_p = to_trace_boxes;
         *box_p = {&_boxes.front(), time_in};
 
+        bool hit = false;
         while (box_p >= to_trace_boxes)
         {
             BoxNode const& box_node = *std::get<0>(*box_p);
@@ -496,6 +576,81 @@ public:
     }
 
 
+    bool test_hit_face(u32 face_index, Ray const& ray, fg max_ray_time) const noexcept
+    {
+        indices const& vertex_indices = _faces[face_index];
+        normal3g const& face_normal = _face_normals[face_index];
+        vec3g const& face_constants = _face_consts[face_index];
+        vec3g const& A = _vertices[vertex_indices.x];
+        vec3g const& B = _vertices[vertex_indices.y];
+        vec3g const& C = _vertices[vertex_indices.z];
+
+        fg d_dot_n = dot(ray.direction, face_normal);
+        // triangle cannot be seen from behind, may be deprecated this line
+        if (d_dot_n >= 0) { return false; }
+
+        fg hit_time = dot(A - ray.origin, face_normal) / d_dot_n;
+        if ((hit_time < defaults<fg>::eps) || (hit_time >= max_ray_time)) { return false; }
+
+        vec3g hit_point = ray.at(hit_time);
+        vec3g coord_point = hit_point - A;
+        fg co_u = dot(coord_point, B - A), co_v = dot(coord_point, C - A);
+        fg contra_u = co_u * face_constants.z - co_v * face_constants.y;
+        fg contra_v = co_v * face_constants.x - co_u * face_constants.y;
+        fg contra_w = 1 - contra_u - contra_v;
+        if ((contra_u <= 0) || (contra_v <= 0) || (contra_w <= 0)) { return false; }
+
+        return true;
+    }
+
+    bool test_hit(Ray const& ray, fg max_ray_time) const noexcept
+    {
+        auto [time_in, time_out] = _boxes.front().box.trace(ray);
+        if ((time_out < defaults<fg>::eps) || (time_in >= time_out)) { return false; }
+
+        using StackEltype = std::tuple<BoxNode const* /* box */, fg /* time_in */>;
+        StackEltype to_trace_boxes[max_boxes_depth + 1];
+        StackEltype * box_p = to_trace_boxes;
+        *box_p = {&_boxes.front(), time_in};
+
+        while (box_p >= to_trace_boxes)
+        {
+            BoxNode const& box_node = *std::get<0>(*box_p);
+            time_in = std::get<1>(*(box_p--));
+
+            if (time_in >= max_ray_time) { continue; }
+
+            if (box_node.isleaf())
+            {
+                u32 stop = box_node.triangle_start() + box_node.triangles_length();
+                for (u32 face_index = box_node.triangle_start(); face_index < stop; face_index++)
+                {
+                    if (test_hit_face(face_index, ray, max_ray_time)) { return true; }
+                }
+            }
+            else
+            {
+                // trace two chidren box
+                BoxNode const* child_l = &_boxes[box_node.leftchild()];
+                BoxNode const* child_r = &_boxes[box_node.rightchild()];
+                auto [in_l, out_l] = child_l->box.trace(ray);
+                auto [in_r, out_r] = child_r->box.trace(ray);
+
+                // push them in to stack (or not)
+                if ((out_r >= defaults<fg>::eps) && (in_r < out_r))
+                {
+                    *(++box_p) = {child_r, in_r};
+                }
+                if ((out_l >= defaults<fg>::eps) && (in_l < out_l))
+                {
+                    *(++box_p) = {child_l, in_l};
+                }
+            }
+        }
+        return false;
+    }
+
+
     /******** load obj file ********/
 
     static MeshPtr load_obj(std::filesystem::path const& path)
@@ -537,7 +692,7 @@ MeshPtr Mesh::load_obj(std::ifstream & file)
             line_buff >> part; v.z =  s2n<fg>(part);
             line_buff >> part; v.y = -s2n<fg>(part);
             // should left nothing in `line_buff`
-            mesh_p->vertices.push_back(v);
+            mesh_p->add_vertex(v);
         }
         else if (part == "f")   // polygonal face element
         {
@@ -546,7 +701,7 @@ MeshPtr Mesh::load_obj(std::ifstream & file)
             line_buff >> part; indeces.z = s2n<u32>(part);
             // TODO: support many indces `.../.../...`
             // TODO: slpit polygon to triangles
-            mesh_p->faces.push_back(indeces - 1);
+            mesh_p->add_face(indeces - 1);
         }
     }
 
@@ -556,8 +711,7 @@ MeshPtr Mesh::load_obj(std::ifstream & file)
 MeshPtr Mesh::tetrahedron()
 {
     MeshPtr mesh_p = std::make_shared<Mesh>();
-    mesh_p->vertices.reserve(4);
-    mesh_p->faces.reserve(4);
+    mesh_p->reserve_vertices(4).reserve_faces(4);
 
     f32 root2 = std::sqrt(2.0f);
     f32 z = -defaults<f32>::third;
@@ -565,74 +719,75 @@ MeshPtr Mesh::tetrahedron()
     f32 x2 = -root2 / 3;
     f32 y = std::sqrt(2.0f / 3.0f);
 
-    mesh_p->vertices.emplace_back(0,   0, 1);
-    mesh_p->vertices.emplace_back(x1,  0, z);
-    mesh_p->vertices.emplace_back(x2, -y, z);
-    mesh_p->vertices.emplace_back(x2,  y, z);
+    u32 top               = mesh_p->add_vertex(vec3g(0,   0, 1));
+    u32 bottom_front      = mesh_p->add_vertex(vec3g(x1,  0, z));
+    u32 bottom_back_left  = mesh_p->add_vertex(vec3g(x2, -y, z));
+    u32 bottom_back_right = mesh_p->add_vertex(vec3g(x2, -y, z));
 
-    mesh_p->faces.emplace_back(1, 2, 3);
-    mesh_p->faces.emplace_back(1, 0, 2);
-    mesh_p->faces.emplace_back(1, 3, 0);
-    mesh_p->faces.emplace_back(0, 3, 2);
+    mesh_p->add_face(top, bottom_back_right, bottom_front);
+    mesh_p->add_face(top, bottom_front, bottom_back_left);
+    mesh_p->add_face(top, bottom_back_left, bottom_back_right);
+    mesh_p->add_face(bottom_front, bottom_back_right, bottom_back_left);
 
+    mesh_p->enable_normal_interpolation = false;
     return mesh_p;
 }
 
 MeshPtr Mesh::hexahedron()
 {
     MeshPtr mesh_p = std::make_shared<Mesh>();
-    mesh_p->vertices.reserve(8);
-    mesh_p->faces.reserve(12);
+    mesh_p->reserve_vertices(8).reserve_faces(12);
 
     f32 v = 1.0f / std::sqrt(3.0f);
 
-    mesh_p->vertices.emplace_back(-v, -v, -v);
-    mesh_p->vertices.emplace_back( v, -v, -v);
-    mesh_p->vertices.emplace_back( v,  v, -v);
-    mesh_p->vertices.emplace_back(-v,  v, -v);
-    mesh_p->vertices.emplace_back(-v, -v,  v);
-    mesh_p->vertices.emplace_back( v, -v,  v);
-    mesh_p->vertices.emplace_back( v,  v,  v);
-    mesh_p->vertices.emplace_back(-v,  v,  v);
+    mesh_p->add_vertex(vec3g(-v, -v, -v));
+    mesh_p->add_vertex(vec3g( v, -v, -v));
+    mesh_p->add_vertex(vec3g( v,  v, -v));
+    mesh_p->add_vertex(vec3g(-v,  v, -v));
+    mesh_p->add_vertex(vec3g(-v, -v,  v));
+    mesh_p->add_vertex(vec3g( v, -v,  v));
+    mesh_p->add_vertex(vec3g( v,  v,  v));
+    mesh_p->add_vertex(vec3g(-v,  v,  v));
 
-    mesh_p->faces.emplace_back(0, 3, 2);
-    mesh_p->faces.emplace_back(0, 2, 1);
-    mesh_p->faces.emplace_back(0, 1, 5);
-    mesh_p->faces.emplace_back(0, 5, 4);
-    mesh_p->faces.emplace_back(1, 2, 6);
-    mesh_p->faces.emplace_back(1, 6, 5);
-    mesh_p->faces.emplace_back(2, 3, 7);
-    mesh_p->faces.emplace_back(2, 7, 6);
-    mesh_p->faces.emplace_back(3, 0, 4);
-    mesh_p->faces.emplace_back(3, 4, 7);
-    mesh_p->faces.emplace_back(4, 5, 7);
-    mesh_p->faces.emplace_back(5, 6, 7);
+    mesh_p->add_face(0, 3, 2);
+    mesh_p->add_face(0, 2, 1);
+    mesh_p->add_face(0, 1, 5);
+    mesh_p->add_face(0, 5, 4);
+    mesh_p->add_face(1, 2, 6);
+    mesh_p->add_face(1, 6, 5);
+    mesh_p->add_face(2, 3, 7);
+    mesh_p->add_face(2, 7, 6);
+    mesh_p->add_face(3, 0, 4);
+    mesh_p->add_face(3, 4, 7);
+    mesh_p->add_face(4, 5, 7);
+    mesh_p->add_face(5, 6, 7);
 
+    mesh_p->enable_normal_interpolation = false;
     return mesh_p;
 }
 
 MeshPtr Mesh::octahedron()
 {
     MeshPtr mesh_p = std::make_shared<Mesh>();
-    mesh_p->vertices.reserve(6);
-    mesh_p->faces.reserve(8);
+    mesh_p->reserve_vertices(6).reserve_faces(8);
 
-    mesh_p->vertices.emplace_back( 0,  0,  1);
-    mesh_p->vertices.emplace_back( 1,  0,  0);
-    mesh_p->vertices.emplace_back( 0,  1,  0);
-    mesh_p->vertices.emplace_back(-1,  0,  0);
-    mesh_p->vertices.emplace_back( 0, -1,  0);
-    mesh_p->vertices.emplace_back( 0,  0, -1);
+    mesh_p->add_vertex(vec3g( 0,  0,  1));
+    mesh_p->add_vertex(vec3g( 1,  0,  0));
+    mesh_p->add_vertex(vec3g( 0,  1,  0));
+    mesh_p->add_vertex(vec3g(-1,  0,  0));
+    mesh_p->add_vertex(vec3g( 0, -1,  0));
+    mesh_p->add_vertex(vec3g( 0,  0, -1));
 
-    mesh_p->faces.emplace_back(0, 1, 2);
-    mesh_p->faces.emplace_back(0, 2, 3);
-    mesh_p->faces.emplace_back(0, 3, 4);
-    mesh_p->faces.emplace_back(0, 4, 1);
-    mesh_p->faces.emplace_back(5, 2, 1);
-    mesh_p->faces.emplace_back(5, 3, 2);
-    mesh_p->faces.emplace_back(5, 4, 3);
-    mesh_p->faces.emplace_back(5, 1, 4);
+    mesh_p->add_face(0, 1, 2);
+    mesh_p->add_face(0, 2, 3);
+    mesh_p->add_face(0, 3, 4);
+    mesh_p->add_face(0, 4, 1);
+    mesh_p->add_face(5, 2, 1);
+    mesh_p->add_face(5, 3, 2);
+    mesh_p->add_face(5, 4, 3);
+    mesh_p->add_face(5, 1, 4);
 
+    mesh_p->enable_normal_interpolation = false;
     return mesh_p;
 }
 
@@ -646,53 +801,58 @@ MeshPtr Mesh::uv_sphere(u32 n_longitude, u32 n_latitude)
     n_latitude  = std::max(1u, n_latitude);
 
     MeshPtr mesh_p = std::make_shared<Mesh>();
-    mesh_p->vertices.reserve(n_longitude * n_latitude + 2);
-    mesh_p->faces.reserve(n_longitude * n_latitude * 2);
+    mesh_p->reserve_vertices(n_longitude * n_latitude * 2).reserve_faces(n_longitude * n_latitude + 2);
 
-    mesh_p->vertices.emplace_back(0, 0,  1);    // top vertex
-    mesh_p->vertices.emplace_back(0, 0, -1);    // bottom vertex
-    for (u32 latitude_count = 0; latitude_count < n_latitude; latitude_count++)
+    mesh_p->add_vertex(VertexInfo{ defaults<vec3g>::Z,  defaults<vec3g>::Z, defaults<vec2g>::Y});    // top vertex
+    mesh_p->add_vertex(VertexInfo{-defaults<vec3g>::Z, -defaults<vec3g>::Z, defaults<vec2g>::O});    // bottom vertex
+    for (u32 v = 0; v < n_latitude; v++)
     {
-        fg theta = defaults<fg>::pi * (latitude_count + 1) / (n_latitude + 1);
+        fg theta = defaults<fg>::pi * (v + 1) / (n_latitude + 1);
         fg stheta = std::sin(theta), ctheta = std::cos(theta);
-        for (u32 longitude_count = 0; longitude_count < n_longitude; longitude_count++)
+        for (u32 u = 0; u < n_longitude; u++)
         {
-            fg phi = defaults<fg>::two_pi * longitude_count / n_longitude;
+            fg phi = defaults<fg>::two_pi * u / n_longitude;
             fg sphi = std::sin(phi), cphi = std::cos(phi);
-            mesh_p->vertices.emplace_back(cphi * stheta, sphi * stheta, ctheta);
+
+            VertexInfo vertex;
+            vertex.position = vec3g(cphi * stheta, sphi * stheta, ctheta);
+            vertex.normal = vertex.position;
+            vertex.texture_coordinate = vec2g(u, v + 1) / vec2g(n_longitude - 1, n_latitude + 1);
+            mesh_p->add_vertex(vertex);
         }
     }
 
-    u32 last_round_vertices_index = (n_latitude - 1) * n_longitude + 2;
-    for (u32 longitude_count = 1; longitude_count < n_longitude; longitude_count++)
+    u32 v_index = (n_latitude - 1) * n_longitude + 2;
+    for (u32 u = 1; u < n_longitude; u++)
     {
-        mesh_p->faces.emplace_back(0, longitude_count + 1, longitude_count + 2);    // top faces
-        mesh_p->faces.emplace_back(1, last_round_vertices_index + longitude_count, last_round_vertices_index + longitude_count - 1);    // bottom faces
+        mesh_p->add_face(0, u + 1, u + 2);    // top faces
+        mesh_p->add_face(1, v_index + u, v_index + u - 1);    // bottom faces
     }
-    mesh_p->faces.emplace_back(0, n_longitude + 1, 2);  // top face when longitude_count = 0
-    mesh_p->faces.emplace_back(1, last_round_vertices_index, last_round_vertices_index + n_longitude - 1);  // bottom face when longitude_count = 0
-    for (u32 latitude_count = 1; latitude_count < n_latitude; latitude_count++)
+    mesh_p->add_face(0, n_longitude + 1, 2);  // top face when u = 0
+    mesh_p->add_face(1, v_index, v_index + n_longitude - 1);  // bottom face when u = 0
+    for (u32 v = 1; v < n_latitude; v++)
     {
-        u32 vertices_index = n_longitude * latitude_count + 2;
-        for (u32 longitude_count = 1; longitude_count < n_longitude; longitude_count++)
+        v_index = n_longitude * v + 2;
+        for (u32 u = 1; u < n_longitude; u++)
         {
             // rectangle
-            mesh_p->faces.emplace_back(vertices_index + longitude_count - 1, vertices_index + longitude_count, vertices_index - n_longitude + longitude_count - 1);
-            mesh_p->faces.emplace_back(vertices_index + longitude_count, vertices_index - n_longitude + longitude_count, vertices_index - n_longitude + longitude_count - 1);
+            mesh_p->add_face(v_index + u - 1, v_index + u, v_index - n_longitude + u - 1);
+            mesh_p->add_face(v_index + u, v_index - n_longitude + u, v_index - n_longitude + u - 1);
         }
-        // rectangle when longitude_count = 0
-        mesh_p->faces.emplace_back(vertices_index + n_longitude - 1, vertices_index, vertices_index - 1);
-        mesh_p->faces.emplace_back(vertices_index, vertices_index - n_longitude, vertices_index - 1);
+        // rectangle when u = 0
+        mesh_p->add_face(v_index + n_longitude - 1, v_index, v_index - 1);
+        mesh_p->add_face(v_index, v_index - n_longitude, v_index - 1);
     }
 
+    mesh_p->enable_normal_interpolation = true;
+    mesh_p->custom_vertex_normals = true;
     return mesh_p;
 }
 
 MeshPtr Mesh::torus(fg tube_radius, u32 n_a, u32 n_b)
 {
     MeshPtr mesh_p = std::make_shared<Mesh>();
-    mesh_p->vertices.reserve(n_a * n_b);
-    mesh_p->faces.reserve(n_a * n_b * 2);
+    mesh_p->reserve_vertices(n_a * n_b).reserve_faces(n_a * n_b * 2);
 
     for (u32 b = 0; b < n_b; b++)
     {
@@ -701,28 +861,35 @@ MeshPtr Mesh::torus(fg tube_radius, u32 n_a, u32 n_b)
         for (u32 a = 0; a < n_a; a++)
         {
             fg phi = defaults<fg>::two_pi * a / n_a;
-            fg x = tube_radius * std::cos(phi) + 1, z = tube_radius * std::sin(phi);
-            mesh_p->vertices.emplace_back(x * xx, x * yy, z);
+            fg x = tube_radius * std::cos(phi), z = tube_radius * std::sin(phi);
+
+            VertexInfo vertex;
+            vertex.position = vec3g((x + 1) * xx, (x + 1) * yy, z);
+            vertex.normal = vec3g(x * xx, x * yy, z);
+            vertex.texture_coordinate = vec2g(b, a) / vec2g(n_b - 1, n_a - 1);
+            mesh_p->add_vertex(vertex);
         }
     }
 
-    mesh_p->faces.emplace_back(0, (n_b - 1) * n_a, n_b * n_a - 1);
-    mesh_p->faces.emplace_back(0, n_b * n_a - 1, n_a - 1);
+    mesh_p->add_face(0, (n_b - 1) * n_a, n_b * n_a - 1);
+    mesh_p->add_face(0, n_b * n_a - 1, n_a - 1);
     for (u32 a = 1; a < n_a; a++)
     {
-        mesh_p->faces.emplace_back(a, (n_b - 1) * n_a + a, (n_b - 1) * n_a + a - 1);
-        mesh_p->faces.emplace_back(a, (n_b - 1) * n_a + a - 1, a - 1);
+        mesh_p->add_face(a, (n_b - 1) * n_a + a, (n_b - 1) * n_a + a - 1);
+        mesh_p->add_face(a, (n_b - 1) * n_a + a - 1, a - 1);
     }
     for (u32 b = 1; b < n_b; b++)
     {
-        mesh_p->faces.emplace_back(b * n_a, (b - 1) * n_a, b * n_a - 1);
-        mesh_p->faces.emplace_back(b * n_a, b * n_a - 1, (b + 1) * n_a - 1);
+        mesh_p->add_face(b * n_a, (b - 1) * n_a, b * n_a - 1);
+        mesh_p->add_face(b * n_a, b * n_a - 1, (b + 1) * n_a - 1);
         for (u32 a = 1; a < n_a; a++)
         {
-            mesh_p->faces.emplace_back(b * n_a + a, (b - 1) * n_a + a, (b - 1) * n_a + a - 1);
-            mesh_p->faces.emplace_back(b * n_a + a, (b - 1) * n_a + a - 1, b * n_a + a - 1);
+            mesh_p->add_face(b * n_a + a, (b - 1) * n_a + a, (b - 1) * n_a + a - 1);
+            mesh_p->add_face(b * n_a + a, (b - 1) * n_a + a - 1, b * n_a + a - 1);
         }
     }
 
+    mesh_p->enable_normal_interpolation = true;
+    mesh_p->custom_vertex_normals = true;
     return mesh_p;
 }

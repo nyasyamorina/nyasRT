@@ -1,9 +1,9 @@
 #pragma once
 
-#include "Texture.hpp"
+#include "Material.hpp"
 
 
-class PureColor : public Texture
+class PureColor : public Material
 {
 public:
 

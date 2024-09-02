@@ -6,21 +6,27 @@
 #include "vec3.hpp"
 #include "vec4.hpp"
 #include "Ray.hpp"
-#include "Mesh.hpp"
 
+
+class Rotation;
+CONST_FUNC Rotation operator * (Rotation const& second, Rotation const& first) noexcept;
 
 class Rotation final
 {
 public:
 
-    vec4g quaternion;
+    normal4g quaternion;
 
     CONST_FUNC Rotation() noexcept
     : quaternion{defaults<vec4g>::W} {}
-    CONST_FUNC Rotation(vec4g const& NORMALIZED q) noexcept
+    CONST_FUNC Rotation(normal4g const& q) noexcept
     : quaternion{q} {}
-    CONST_FUNC Rotation(vec3g const& NORMALIZED axis, fg angle) noexcept
+    CONST_FUNC Rotation(normal3g const& axis, fg angle) noexcept
     : quaternion{std::sin(defaults<fg>::half * angle) * axis, std::cos(defaults<fg>::half * angle)} {}
+    CONST_FUNC Rotation(fg yaw, fg pitch, fg roll) noexcept
+    {
+        *this = Rotation(defaults<vec3g>::Z, yaw) * Rotation(defaults<vec3g>::Y, pitch) * Rotation(defaults<vec3g>::X, roll);
+    }
 
 
     CONST_FUNC Rotation & operator *= (Rotation const& rot) noexcept
@@ -38,24 +44,23 @@ public:
         return *this;
     }
 
-    CONST_FUNC Rotation & inverse() noexcept
-    {
-        quaternion = qconj(quaternion);
-        return *this;
-    }
     CONST_FUNC Rotation & mul(Rotation const& rot) noexcept
     {
         return ((*this) *= rot);
     }
 
-
-    CONST_FUNC vec3g axis() const noexcept
+    CONST_FUNC normal3g axis() const noexcept
     {
         return quaternion.xyz().normalize();
     }
     CONST_FUNC fg angle() const noexcept
     {
         return 2 * std::atan2(length(quaternion.xyz()), quaternion.w);
+    }
+
+    CONST_FUNC Rotation inverse() const noexcept
+    {
+        return Rotation(qconj(quaternion));
     }
 
     CONST_FUNC vec3g apply(vec3g const& v) const noexcept
@@ -104,7 +109,7 @@ public:
     CONST_FUNC Transform() noexcept
     : rotation{}, scaler{1}, offset{defaults<vec3g>::O} {}
 
-    CONST_FUNC Transform & rotate(vec3g const& NORMALIZED axis, fg angle) noexcept
+    CONST_FUNC Transform & rotate(normal3g const& axis, fg angle) noexcept
     {
         return rotate(Rotation(axis, angle));
     }
@@ -124,6 +129,15 @@ public:
     {
         offset += offset_;
         return *this;
+    }
+
+    CONST_FUNC Transform inverse() const noexcept
+    {
+        Transform inv;
+        inv.rotation = rotation.inverse();
+        inv.scaler = 1 / scaler;
+        inv.offset = -offset;
+        return inv;
     }
 
     CONST_FUNC vec3g apply_normal(vec3g const& n) const noexcept
@@ -158,26 +172,5 @@ public:
     CONST_FUNC Ray undo(Ray const& ray) const noexcept
     {
         return Ray(undo_point(ray.origin), undo_vector(ray.direction));
-    }
-
-    CONST_FUNC Mesh & apply(Mesh & mesh) const noexcept
-    {
-        // the subdivide boxes will bread
-        mesh.prepared = false;
-        for (vec3g & vertex : mesh.vertices)
-        {
-            vertex = apply_point(vertex);
-        }
-        return mesh;
-    }
-    CONST_FUNC Mesh & undo(Mesh & mesh) const noexcept
-    {
-        // the subdivide boxes will bread
-        mesh.prepared = false;
-        for (vec3g & vertex : mesh.vertices)
-        {
-            vertex = undo_point(vertex);
-        }
-        return mesh;
     }
 };

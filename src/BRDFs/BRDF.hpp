@@ -20,7 +20,7 @@ public:
         return true;
     }
 
-    virtual CONST_FUNC std::tuple<vec3g, RGB> bounds(RGB const& base_color, Ray const& ray, TraceRecord const& rec) const noexcept
+    virtual CONST_FUNC std::tuple<normal3g, RGB> bounds(RGB const& base_color, Ray const& ray, TraceRecord const& rec) const noexcept
     {
         // sample on upper hemisphere with distribution `dΩ = cosθ*dθdφ`
         if (dot(ray.direction, rec.face_normal) > 0) // ray hit surface from behind
@@ -40,7 +40,7 @@ public:
         return defaults<RGB>::Black;
     }
 
-    virtual RGB operator () (RGB const& base_color, vec3g const& NORMALIZED incoming, vec3g const& NORMALIZED outgoing, vec3g const& NORMALIZED normal) const noexcept = 0;
+    virtual RGB operator () (RGB const& base_color, normal3g const& incoming, normal3g const& outgoing, normal3g const& normal) const noexcept = 0;
 };
 
 using BRDFPtr = std::shared_ptr<BRDF>;

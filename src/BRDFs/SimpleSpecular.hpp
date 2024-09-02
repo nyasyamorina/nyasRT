@@ -46,7 +46,7 @@ public:
     }
 
 
-    virtual CONST_FUNC std::tuple<vec3g, RGB> bounds(RGB const& base_color, Ray const& ray, TraceRecord const& rec) const noexcept override
+    virtual CONST_FUNC std::tuple<normal3g, RGB> bounds(RGB const& base_color, Ray const& ray, TraceRecord const& rec) const noexcept override
     {
         if (dot(ray.direction, rec.face_normal) > 0) // ray hit surface from behind
         {
@@ -54,21 +54,19 @@ public:
         }
 
         // sample on upper hemisphere with distribution `dΩ = cosθ*dθdφ`
-        vec3g outgoing = rec.hit_normal + Sampler::sphere(random.uniform01<vec2g>());
+        normal3g outgoing = Sampler::sphere(random.uniform01<vec2g>());
         RGB surface_color = defaults<RGB>::White;
-        // normalize
-        if (fg lo = length(outgoing); lo >= defaults<fg>::eps) { outgoing *= 1 / lo; }
-        else { outgoing = rec.hit_normal; }
 
-        if (random.uniform01<f32>() > 0.25f * _clearcoat)
+        if (random.uniform01<f32>() > _clearcoat)
         {
-            vec3g prefect_reflection = reflect(ray.direction, rec.hit_normal);
+            normal3g prefect_reflection = reflect(ray.direction, rec.hit_normal);
             outgoing = normalize(mix(prefect_reflection, outgoing, _roughness));
             surface_color = base_color;
         }
 
+        if (dot(outgoing, rec.hit_normal) < 0) { outgoing.reflect(rec.hit_normal); }
         //if (dot(outgoing, rec.face_normal) < 0) { outgoing.reflect(rec.face_normal); }
-        return {outgoing, surface_color};
+        return {outgoing, surface_color * dot(outgoing, rec.hit_normal)};
     }
 
     virtual CONST_FUNC RGB emitted(RGB const& base_color, Ray const& ray, TraceRecord const& rec) const noexcept override
@@ -76,9 +74,43 @@ public:
         return _emittion;
     }
 
-    virtual CONST_FUNC RGB operator () (RGB const& base_color, vec3g const& NORMALIZED incoming, vec3g const& NORMALIZED outgoing, vec3g const& NORMALIZED normal) const noexcept override
+    virtual CONST_FUNC RGB operator () (RGB const& base_color, normal3g const& incoming, normal3g const& outgoing, normal3g const& normal) const noexcept override
     {
-        // unknown BRDF
-        return RGB(-1.0f);
+        // yeah, this BRDF model produces incorrect specular shape.
+
+        RGB reflected_color = mix(base_color, defaults<RGB>::White, _clearcoat);
+        f32 pdf = 0;
+
+        normal3g prefect_reflection = -reflect(outgoing, normal);
+        vec3g C = (1 - _roughness) * prefect_reflection;
+        f32 r2 = sqr(_roughness);
+        f32 r_pdf_sphere = 1 / (4 * defaults<fg>::pi * _roughness);
+
+        // the probability density of outgoing not being reflected back to the upper hemisphere
+        {
+            f32 t = dot(incoming, C);
+            f32 d2 = length2(t * incoming - C);
+            if (d2 < r2)
+            {
+                f32 s = std::sqrt(r2 - d2);
+                pdf += r_pdf_sphere * sqr(t + s) / s;
+                if (f32 tmp = t - s; tmp > 0) { pdf += r_pdf_sphere * sqr(tmp) / s; }
+            }
+        }
+        // the probability density of light being reflected back to the upper hemisphere
+        {
+            normal3g r_incoming = reflect(incoming, normal);
+            f32 t = dot(r_incoming, C);
+            f32 d2 = length2(t * r_incoming - C);
+            if (d2 < r2)
+            {
+                f32 s = std::sqrt(r2 - d2);
+                pdf += r_pdf_sphere * sqr(t + s) / s;
+                if (f32 tmp = t - s; tmp > 0) { pdf += r_pdf_sphere * sqr(tmp) / s; }
+            }
+        }
+
+        pdf = mix(pdf, defaults<f32>::inv_pi, _clearcoat);
+        return pdf * reflected_color;
     }
 };

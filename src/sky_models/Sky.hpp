@@ -16,7 +16,7 @@ public:
         return true;
     }
 
-    virtual RGB operator () (vec3g const& NORMALIZED direction) const noexcept = 0;
+    virtual RGB operator () (normal3g const& direction) const noexcept = 0;
 };
 
 using SkyPtr = std::shared_ptr<Sky>;

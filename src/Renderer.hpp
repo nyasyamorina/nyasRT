@@ -116,33 +116,49 @@ public:
     }
     RGB render_screen(vec2g const& position) const noexcept
     {
-        Ray ray = _scence.camera_ref().cast_ray(position);  // ray.direction has been normalized
+        Ray ray = _scence.camera_ref().cast_ray(position);
         TraceRecord rec;
         u32 bounds = 0;
+        RGB received;
+
+        // TODO: directly render lights in screen
 
         while (true)
         {
             // tracing ray
             rec.reset();
-            for (Object3D const& object : _scence.objects)
-            {
-                object.trace(ray, rec);
-            }
+            _scence.trace(ray, rec);
 
             if ((bounds < config.max_ray_bounds) && rec.hit_object())
             {
-                // get surface texture color
-                RGB surface_color = (*rec.object_p->texture_p)(ray, rec);
+                // get surface material color
+                RGB surface_color = (*rec.object_p->material_p)(ray, rec);
 
                 // next bounds direction
                 rec.hit_normal.normalize();
                 auto [outgoing, reflected] = rec.object_p->brdf_p->bounds(surface_color, ray, rec);
 
                 // render object surface
-                rec.ray_color += rec.reflect_color * rec.object_p->brdf_p->emitted(surface_color, ray, rec);
-                rec.reflect_color *= reflected;
+                received = rec.object_p->brdf_p->emitted(surface_color, ray, rec);
+
+                // render_lights
+                Ray light_ray; light_ray.origin = rec.hit_point;
+                for (LightSourcePtr const& light_p : _scence.light_ps)
+                {
+                    auto [direction, max_light_ray_time] = light_p->sample(light_ray.origin);
+                    light_ray.direction = direction;
+
+                    f32 l_dot_n = dot(light_ray.direction, rec.hit_normal);
+                    if ((l_dot_n > 0) && !_scence.test_hit(light_ray, max_light_ray_time))
+                    {
+                        RGB surface_brdf = (*rec.object_p->brdf_p)(surface_color, light_ray.direction, -ray.direction, rec.hit_normal);
+                        received += surface_brdf * l_dot_n * light_p->light(light_ray);
+                    }
+                }
 
                 // ray bounds
+                rec.ray_color += rec.reflect_color * received;
+                rec.reflect_color *= reflected;
                 ray.origin = rec.hit_point;
                 ray.direction = outgoing;
                 bounds++;

@@ -128,7 +128,7 @@ public:
 
 
     // https://github.com/wdas/brdf/blob/main/src/brdfs/disney.brdf
-    virtual CONST_FUNC RGB operator () (RGB const& base_color, vec3g const& NORMALIZED incoming, vec3g const& NORMALIZED outgoing, vec3g const& NORMALIZED normal) const noexcept override
+    virtual CONST_FUNC RGB operator () (RGB const& base_color, normal3g const& incoming, normal3g const& outgoing, normal3g const& normal) const noexcept override
     {
         f32 i_dot_n = dot(incoming, normal), o_dot_n = dot(outgoing, normal);
         if ((i_dot_n < 0) || (o_dot_n < 0)) { return defaults<RGB>::Black; }
