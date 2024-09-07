@@ -3,7 +3,7 @@
 #include "BRDF.hpp"
 
 
-class SimpleSpecular : public BRDF
+class SimplyWrongSpecular : public BRDF
 {
 protected:
 
@@ -12,21 +12,21 @@ protected:
 
 public:
 
-    CONST_FUNC SimpleSpecular() noexcept
+    CONST_FUNC SimplyWrongSpecular() noexcept
     : _emittion{defaults<RGB>::Black}, _roughness{0.5f}, _clearcoat{0.5f} {}
-    virtual ~SimpleSpecular() noexcept = default;
+    virtual ~SimplyWrongSpecular() noexcept = default;
 
-    CONST_FUNC SimpleSpecular & emittion(RGB const& value) noexcept
+    CONST_FUNC SimplyWrongSpecular & emittion(RGB const& value) noexcept
     {
         _emittion = value;
         return *this;
     }
-    CONST_FUNC SimpleSpecular & roughness(f32 value) noexcept
+    CONST_FUNC SimplyWrongSpecular & roughness(f32 value) noexcept
     {
         _roughness = value;
         return *this;
     }
-    CONST_FUNC SimpleSpecular & clearcoat(f32 value) noexcept
+    CONST_FUNC SimplyWrongSpecular & clearcoat(f32 value) noexcept
     {
         _clearcoat = value;
         return *this;

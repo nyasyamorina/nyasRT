@@ -50,7 +50,7 @@ ScencePtr two_torus_interlocking(fg tube_radius, u32 n_a, u32 n_b)
     u32 floor_C = floor_p->add_vertex(vec3g(-500,  500, floor_z));
     floor_p->add_face(floor_A, floor_B, floor_C);
     auto floor_material_p = std::make_shared<PureColor>(RGB(0.6, 0.75, 0.85));
-    //auto floor_brdf_p = std::make_shared<SimpleSpecular>();
+    //auto floor_brdf_p = std::make_shared<SimplyWrongSpecular>();
     //floor_brdf_p->roughness(0.7).clearcoat(0.25);
     auto floor_brdf_p = std::make_shared<DisneyBRDF>();
     floor_brdf_p->subsurface(0.5).metalic(0.2).specular(0.3).roughness(0.8).sheen(0);

@@ -1,5 +1,5 @@
-.vscode
+.*
+
 build
-models
 out_*
 TODO*

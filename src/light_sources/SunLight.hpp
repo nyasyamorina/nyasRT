@@ -7,6 +7,7 @@
 #include "../geometry/Transform.hpp"
 #include "../random.hpp"
 #include "../Sampler.hpp"
+#include "../Interpolation.hpp"
 #include "LightSource.hpp"
 
 
@@ -15,7 +16,8 @@ class SunLight final : public LightSource
     static constexpr f32 solar_radius = deg2rad(0.267f);
     static constexpr f32 solor_solid_angle = defaults<f32>::pi * sqr(solar_radius); // assume `solar_radius ~= 0`
 
-    static constexpr std::array<RGB, 256> solor_radiances =
+    static constexpr vec2<u32> solor_radiances_table_size = vec2<u32>(16, 16);
+    static constexpr std::array<RGB, prod(solor_radiances_table_size)> solor_radiances =
     {
         RGB(    39.4028,     1.98004, 5.96046e-08), RGB(68821.4,   29221.3,     3969.28), RGB( 189745,  116333,     43283.4), RGB( 284101,  199843,  103207), RGB( 351488,  265139,  161944), RGB( 400584,  315075,  213163), RGB( 437555,  353806,  256435), RGB( 466261,  384480,  292823), RGB(489140,  409270,  323569), RGB(507776,  429675,  349757), RGB(523235,  446739,  372260), RGB(536260, 461207,  391767), RGB(547379, 473621,  408815), RGB(556978, 484385,  423827), RGB(565348, 493805, 437137), RGB(572701, 502106, 449002),
         RGB(    34.9717,   0.0775114,           0), RGB(  33531,   11971.9,     875.627), RGB( 127295,   71095,     22201.3), RGB( 216301,  142827, 66113.9), RGB( 285954,  205687,  115900), RGB( 339388,  256990,  163080), RGB( 380973,  298478,  205124), RGB( 414008,  332299,  241816), RGB(440780,  360220,  273675), RGB(462869,  383578,  301382), RGB(481379,  403364,  325586), RGB(497102, 420314,  346848), RGB(510615, 434983,  365635), RGB(522348, 447795,  382333), RGB(532628, 459074, 397255), RGB(541698, 469067, 410647),
@@ -37,22 +39,9 @@ class SunLight final : public LightSource
 
     static CONST_FUNC RGB get_solor_radiance(f32 ctheta, f32 turbidity) noexcept
     {
-        ctheta *= 15;
-        u32 s = std::floor(ctheta);
-        if (s == 15) { s = 14; }
-        ctheta -= s;
-
-        turbidity = (turbidity - 1) / 9 * 15;
-        u32 t = std::floor(turbidity);
-        if (t == 15) { t = 14; }
-        turbidity -= t;
-
-        RGB radiance;
-        radiance  = (1 - ctheta) * (1 - turbidity) * solor_radiances[t * 16 + s];
-        radiance += ctheta * (1 - turbidity) * solor_radiances[t * 16 + (s + 1)];
-        radiance += (1 - ctheta) * turbidity * solor_radiances[(t + 1) * 16 + s];
-        radiance += ctheta * turbidity * solor_radiances[(t + 1) * 16 + (s + 1)];
-        return radiance * solor_solid_angle;
+        vec2g pos(ctheta, (turbidity - 1) / 9);
+        pos *= (solor_radiances_table_size - static_cast<fg>(1)) / solor_radiances_table_size;
+        return solor_solid_angle * Interpolation::bilinear(solor_radiances.data(), solor_radiances_table_size, pos);
     }
 
 public:

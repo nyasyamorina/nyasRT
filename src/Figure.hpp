@@ -305,7 +305,7 @@ public:
     : header{}, index{0}, running{}, prev{}, curr{} {
         // initialize header
         header[0] = 'q'; header[1] = 'o'; header[2] = 'i'; header[3] = 'f';
-        header[12] = 3; header[13] = 1;
+        header[12] = 3; header[13] = 0;
 
         // the alpha of colors in `running` are initialized to 0,
         // but we don't track the alphas, so its necessary to make sure that
@@ -334,9 +334,9 @@ public:
         // although the previous of the first pixel should be RGBA(0),
         // but we don't track the alphas, so the first pixel must be not qual to
         // the previous one, even cannot close to it.
-        prev = RGB24(*pix);
+        prev = RGB24(0,0,0); //RGB24(*pix);
         //prev.r = ~prev.r; prev.g = ~prev.g; prev.b = ~prev.b;
-        prev.r += 90; prev.g += 90; prev.b += 90;
+        //prev.r += 90; prev.g += 90; prev.b += 90;
 
         u8 encoded;
         while (pix < end)
@@ -416,7 +416,7 @@ public:
         RGB * end = fig.end();
 
         prev = RGB24(0, 0, 0);
-        u8 alpha = 0;
+        u8 alpha = (header[12] == 3) ? 255 : 0;
 
         u8 encoded, flag, data;
         while (pix < end)
