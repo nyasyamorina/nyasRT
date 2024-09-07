@@ -852,40 +852,29 @@ MeshPtr Mesh::uv_sphere(u32 n_longitude, u32 n_latitude)
 MeshPtr Mesh::torus(fg tube_radius, u32 n_a, u32 n_b)
 {
     MeshPtr mesh_p = std::make_shared<Mesh>();
-    mesh_p->reserve_vertices(n_a * n_b).reserve_faces(n_a * n_b * 2);
+    mesh_p->reserve_vertices((n_a + 1) * (n_b + 1)).reserve_faces(n_a * n_b * 2);
 
-    for (u32 b = 0; b < n_b; b++)
+    VertexInfo vertex;
+    for (u32 b = 0; b <= n_b; b++)
     {
         fg theta = defaults<fg>::two_pi * b / n_b;
         fg xx = std::cos(theta), yy = std::sin(theta);
-        for (u32 a = 0; a < n_a; a++)
+
+        for (u32 a = 0; a <= n_a; a++)
         {
             fg phi = defaults<fg>::two_pi * a / n_a;
-            fg x = tube_radius * std::cos(phi), z = tube_radius * std::sin(phi);
+            fg x = std::cos(phi), z = std::sin(phi);
 
-            VertexInfo vertex;
-            vertex.position = vec3g((x + 1) * xx, (x + 1) * yy, z);
+            vertex.position = vec3g((tube_radius * x + 1) * xx, (tube_radius * x + 1) * yy, tube_radius * z);
             vertex.normal = vec3g(x * xx, x * yy, z);
-            vertex.texture_coordinate = vec2g(b, a) / vec2g(n_b - 1, n_a - 1);
+            vertex.texture_coordinate = vec2g(b, a) / vec2g(n_b, n_a);
             mesh_p->add_vertex(vertex);
-        }
-    }
 
-    mesh_p->add_face(0, (n_b - 1) * n_a, n_b * n_a - 1);
-    mesh_p->add_face(0, n_b * n_a - 1, n_a - 1);
-    for (u32 a = 1; a < n_a; a++)
-    {
-        mesh_p->add_face(a, (n_b - 1) * n_a + a, (n_b - 1) * n_a + a - 1);
-        mesh_p->add_face(a, (n_b - 1) * n_a + a - 1, a - 1);
-    }
-    for (u32 b = 1; b < n_b; b++)
-    {
-        mesh_p->add_face(b * n_a, (b - 1) * n_a, b * n_a - 1);
-        mesh_p->add_face(b * n_a, b * n_a - 1, (b + 1) * n_a - 1);
-        for (u32 a = 1; a < n_a; a++)
-        {
-            mesh_p->add_face(b * n_a + a, (b - 1) * n_a + a, (b - 1) * n_a + a - 1);
-            mesh_p->add_face(b * n_a + a, (b - 1) * n_a + a - 1, b * n_a + a - 1);
+            if ((b < n_b) && (a < n_a))
+            {
+                mesh_p->add_face(b * (n_a + 1) + a, (b + 1) * (n_a + 1) + a, (b + 1) * (n_a + 1) + (a + 1));
+                mesh_p->add_face(b * (n_a + 1) + a, (b + 1) * (n_a + 1) + (a + 1), b * (n_a + 1) + (a + 1));
+            }
         }
     }
 

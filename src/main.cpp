@@ -54,10 +54,9 @@ i32 main(i32, char * *)
         scence_p->sky(sky_p);
         scence_p->light_ps.push_back(sky_p->sun());
 
-        //auto material0_p = std::make_shared<PureColor>(RGB(0.95).remove_gamma());
-        //auto material1_p = std::make_shared<PureColor>(RGB(0.15, 0.2, 0.6).remove_gamma());
-        auto material0_p = std::make_shared<PureColor>(RGB(0.83, 0.59, 0.12).remove_gamma());
-        auto material1_p = std::make_shared<FunctionalMaterial>(RGB(0.97, 0.62, 0.31).remove_gamma(), RGB(0.53, 0.26, 0.07).remove_gamma());
+        auto material0_p = std::make_shared<PureColor>(RGB(0.76, 0.76, 0.86).remove_gamma());
+        //auto material1_p = std::make_shared<FunctionalMaterial>(RGB(0.97, 0.62, 0.31).remove_gamma(), RGB(0.53, 0.26, 0.07).remove_gamma());
+        auto material1_p = Texture::load<QOI>(Interpolation::Bilinear, "../../.textures/donut.qoi");
 
         scence_p->objects[0].material_p = material0_p;
         scence_p->objects[1].material_p = material1_p;
@@ -65,9 +64,9 @@ i32 main(i32, char * *)
         auto brdf0_p = std::make_shared<DisneyBRDF>();
         brdf0_p->subsurface(0.2).metalic(1.0).specular(0.9).specular_tint(1.0).roughness(0.2).sheen(0).clearcoat(0.0).clearcoat_gloss(0.9);
         auto brdf1_p = std::make_shared<DisneyBRDF>();
-        brdf1_p->subsurface(0.1).metalic(0.1).specular(0.9).specular_tint(0.1).roughness(0.5).sheen(0).clearcoat(0.9).clearcoat_gloss(0.7);
-        //auto brdf0_p = std::make_shared<SimpleSpecular>(); brdf0_p->roughness(0.03).clearcoat(0.01);
-        //auto brdf1_p = std::make_shared<SimpleSpecular>(); brdf1_p->roughness(0.55).clearcoat(0.05);
+        brdf1_p->subsurface(0.5).metalic(0.0).specular(0.5).specular_tint(0.0).roughness(0.8).sheen(0).clearcoat(9.9).clearcoat_gloss(0.8);
+        //auto brdf0_p = std::make_shared<SimplyWrongSpecular>(); brdf0_p->roughness(0.03).clearcoat(0.01);
+        //auto brdf1_p = std::make_shared<SimplyWrongSpecular>(); brdf1_p->roughness(0.55).clearcoat(0.05);
 
         scence_p->objects[0].brdf_p = brdf0_p;
         scence_p->objects[1].brdf_p = brdf1_p;
