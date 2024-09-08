@@ -26,7 +26,7 @@ public:
 };
 
 
-class Triangle; class Mesh; class Object3D;
+class Object3D;
 
 class TraceRecord
 {
@@ -39,14 +39,14 @@ public:
     vec2g hit_face, hit_texture;
     Object3D const* object_p;
 #ifdef SHOW_TRACE_INFO
-    u32 box_count, triangle_count;
+    u32 box_count, triangle_count, trace_count;
 #endif
 
     CONST_FUNC TraceRecord() noexcept
     : ray_color{defaults<RGB>::Black}, reflect_color{defaults<RGB>::White}
     , max_ray_time{defaults<fg>::inf} , object_p{nullptr}
 #ifdef SHOW_TRACE_INFO
-    , box_count{0}, triangle_count{0}
+    , box_count{0}, triangle_count{0}, trace_count{0}
 #endif
     {}
 

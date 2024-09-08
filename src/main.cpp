@@ -56,7 +56,7 @@ i32 main(i32, char * *)
 
         auto material0_p = std::make_shared<PureColor>(RGB(0.76, 0.76, 0.86).remove_gamma());
         //auto material1_p = std::make_shared<FunctionalMaterial>(RGB(0.97, 0.62, 0.31).remove_gamma(), RGB(0.53, 0.26, 0.07).remove_gamma());
-        auto material1_p = Texture::load<QOI>(Interpolation::Bilinear, "../../.textures/donut.qoi");
+        auto material1_p = Texture::load<QOI>(Interpolation::Bicubic, "../../.textures/donut.qoi");
 
         scence_p->objects[0].material_p = material0_p;
         scence_p->objects[1].material_p = material1_p;

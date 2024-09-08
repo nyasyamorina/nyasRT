@@ -326,7 +326,7 @@ public:
         _build_bounding_volume_hierarchy();
 
 #ifdef SHOW_TRACE_INFO
-        std::cout << "# of triangles: " << faces.size() << ", # of boxes: " << _boxes.size() << std::endl;
+        std::cout << "# of triangles: " << _faces.size() << ", # of boxes: " << _boxes.size() << std::endl;
 #endif
         return prepared = true;
     }

@@ -21,6 +21,6 @@ public:
 
         f32 w = sum(rec.hit_point);
         w = s * (std::cbrt(std::sin(12 * w) + a) + k);
-        return mix(color2, color1, w);
+        return lerp(color2, color1, w);
     }
 };

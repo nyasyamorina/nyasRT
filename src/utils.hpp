@@ -30,9 +30,27 @@ using fg = f32;
 
 /********** numerical functions **********/
 
-template<class X, class Y, class A> CONST_FUNC auto mix(X const& x, Y const& y, A const& a) noexcept
+// linear interpolation
+template<class X, class T> CONST_FUNC auto lerp(X const& x0, X const& x1, T const& t) noexcept
 {
-    return x + (y - x) * a;
+    return x0 + (x1 - x0) * t;
+}
+template<class F> CONST_FUNC F _cerp_coef2(F const& t) noexcept
+{
+    return static_cast<F>(1.0 / 6.0) * (t * t - 1) * t;
+}
+template<class F> CONST_FUNC F _cerp_coef1(F const& t) noexcept
+{
+    return ((1 - t) * t * static_cast<F>(1.0 / 2.0) + 1) * t;
+}
+// cubic interpolation
+template<class X, class T> CONST_FUNC auto cerp(X const& x_1, X const& x0, X const& x1, X const& x2, T const& t) noexcept
+{
+    T c_1 = _cerp_coef2(1 - t);
+    T c0  = _cerp_coef1(1 - t);
+    T c1  = _cerp_coef1(t);
+    T c2  = _cerp_coef2(t);
+    return c_1 * x_1 + c0 * x0 + c1 * x1 + c2 * x2;
 }
 
 template<class T> CONST_FUNC T sqr(T const& x) noexcept

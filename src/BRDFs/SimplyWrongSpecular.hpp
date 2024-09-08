@@ -60,7 +60,7 @@ public:
         if (random.uniform01<f32>() > _clearcoat)
         {
             normal3g prefect_reflection = reflect(ray.direction, rec.hit_normal);
-            outgoing = normalize(mix(prefect_reflection, outgoing, _roughness));
+            outgoing = normalize(lerp(prefect_reflection, outgoing, _roughness));
             surface_color = base_color;
         }
 
@@ -78,7 +78,7 @@ public:
     {
         // yeah, this BRDF model produces incorrect specular shape.
 
-        RGB reflected_color = mix(base_color, defaults<RGB>::White, _clearcoat);
+        RGB reflected_color = lerp(base_color, defaults<RGB>::White, _clearcoat);
         f32 pdf = 0;
 
         normal3g prefect_reflection = -reflect(outgoing, normal);
@@ -110,7 +110,7 @@ public:
             }
         }
 
-        pdf = mix(pdf, defaults<f32>::inv_pi, _clearcoat);
+        pdf = lerp(pdf, defaults<f32>::inv_pi, _clearcoat);
         return pdf * reflected_color;
     }
 };

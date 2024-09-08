@@ -135,35 +135,36 @@ public:
         vec3g half_vec = normalize(incoming + outgoing);
         f32 i_dot_h = dot(incoming, half_vec), h_dot_n = dot(half_vec, normal);
 
-        f32 lum = brightness(base_color);
-        RGB tint_color = base_color / lum;
-        RGB specular_color = mix(_specular * 0.08f * mix(1.0f, tint_color, _specular_tint), base_color, _metalic);
-        RGB sheen_color = mix(1.0f, tint_color, _sheen_tint);
+        f32 inv_lum = 1 / brightness(base_color);
+        RGB tint_color = base_color * inv_lum;
+        RGB specular_color = lerp(defaults<RGB>::White, tint_color, _specular_tint);
+        specular_color = lerp(0.08f * _specular * specular_color, base_color, _metalic);
+        RGB sheen_color = lerp(defaults<RGB>::White, tint_color, _sheen_tint);
 
         f32 fi = schlick_fresnel(i_dot_n), fo = schlick_fresnel(o_dot_n), fh = schlick_fresnel(i_dot_h);
 
         // diffuse
         f32 fss90 = _roughness * sqr(i_dot_h);
         f32 fd90 = 0.5f + 2.0f * fss90;
-        f32 fd  = mix(1.0f, fd90,  fi) * mix(1.0f, fd90,  fo);
-        f32 fss = mix(1.0f, fss90, fi) * mix(1.0f, fss90, fo);
+        f32 fd  = lerp(1.0f, fd90,  fi) * lerp(1.0f, fd90,  fo);
+        f32 fss = lerp(1.0f, fss90, fi) * lerp(1.0f, fss90, fo);
         f32 ss = 1.25f * (fss * (1.0f / (i_dot_n + o_dot_n) - 0.5f) + 0.5f);
 
         // specular; TODO: _anisotropic
         f32 alpha = sqr(_roughness);
         f32 ds = D_gtr2(h_dot_n, alpha);
-        RGB fs = mix(specular_color, 1.0f, fh);
+        RGB fs = lerp(specular_color, defaults<RGB>::White, fh);
         f32 gs = smith_ggx(i_dot_n, alpha) * smith_ggx(o_dot_n, alpha);
 
         // sheen
         RGB fsheen = fh * _sheen * sheen_color;
 
         // clearcoat
-        f32 dr = D_gtr1(h_dot_n, mix(0.1f, 0.001f, _clearcoat_gloss));
-        f32 fr = mix(0.04f, 1.0f, fh);
+        f32 dr = D_gtr1(h_dot_n, lerp(0.1f, 0.001f, _clearcoat_gloss));
+        f32 fr = lerp(0.04f, 1.0f, fh);
         f32 gr = smith_ggx(i_dot_n, 0.25f) * smith_ggx(o_dot_n, 0.25f);
 
-        return (defaults<f32>::inv_pi * mix(fd, ss, _subsurface) * base_color + fsheen) * (1.0f - _metalic)
+        return (defaults<f32>::inv_pi * lerp(fd, ss, _subsurface) * base_color + fsheen) * (1.0f - _metalic)
             + gs * ds * fs
             + 0.25f * _clearcoat * gr * fr * dr;
     }

@@ -88,7 +88,7 @@ protected:
     };
 
 
-    static constexpr RGB trace_info_scaler = RGB(2000, 2000, 10);
+    static constexpr RGB trace_info_scaler = RGB(2000, 2000, 20);
 
     Scence const& _scence;
 
@@ -121,13 +121,23 @@ public:
         u32 bounds = 0;
         RGB received;
 
-        // TODO: directly render lights in screen
-
         while (true)
         {
             // tracing ray
             rec.reset();
             _scence.trace(ray, rec);
+#ifdef SHOW_TRACE_INFO
+            rec.trace_count++;
+#endif
+
+            // directly render lights on screen
+            if (bounds == 0) for (LightSourcePtr const& light_p : _scence.light_ps)
+            {
+                if (light_p->test_hit(ray, rec.max_ray_time))
+                {
+                    rec.ray_color += light_p->light(ray);
+                }
+            }
 
             if ((bounds < config.max_ray_bounds) && rec.hit_object())
             {
@@ -154,6 +164,9 @@ public:
                         RGB surface_brdf = (*rec.object_p->brdf_p)(surface_color, light_ray.direction, -ray.direction, rec.hit_normal);
                         received += surface_brdf * l_dot_n * light_p->light(light_ray);
                     }
+#ifdef SHOW_TRACE_INFO
+                    rec.trace_count++;
+#endif
                 }
 
                 // ray bounds
@@ -171,12 +184,11 @@ public:
                     rec.ray_color += rec.reflect_color * _scence.sky_ref()(ray.direction);
                 }
 #ifdef SHOW_TRACE_INFO
-                rec.ray_color = RGB(rec.box_count, rec.triangle_count, bounds).div(trace_info_scaler);
+                return RGB(rec.box_count, rec.triangle_count, rec.trace_count).div(trace_info_scaler);
 #endif
-                break;
+                return rec.ray_color;
             }
         }
-        return rec.ray_color;
     }
 
     void render(Figure & fig) const noexcept
