@@ -21,4 +21,4 @@ else()
     endif()
 endif()
 
-add_executable(nyasRT src/main.cpp)
+add_executable(nyasRT main.cpp)

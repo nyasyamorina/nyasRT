@@ -9,13 +9,14 @@
 #include <tuple>
 #include <vector>
 
-#include "../utils.hpp"
-#include "vec3.hpp"
+#include "../common.hpp"
 #include "BoundingBox.hpp"
 #include "Ray.hpp"
 #include "Transform.hpp"
 
 
+namespace nyasRT
+{
 class VertexInfo
 {
 public:
@@ -34,11 +35,12 @@ using MeshConstPtr = std::shared_ptr<Mesh const>;
 
 class Mesh
 {
-    using indices = vec3<u32>;
+    using indices_t = glm::vec<3, u32>;
 
-    template<class T> static CONST_FUNC T interpolate(T const* vertex_data, indices const& vertex_indices, vec2g const& uv) noexcept
+    // interpolation on triangle face
+    template<class T> static inline T trinterpolate(T const* data, indices_t const& vertex_indices, vec2g const& uv) noexcept
     {
-        return (1 - sum(uv)) * vertex_data[vertex_indices.x] + uv.x * vertex_data[vertex_indices.y] + uv.y * vertex_data[vertex_indices.z];
+        return (1 - uv.x - uv.y) * data[vertex_indices.x] + uv.x * data[vertex_indices.y] + uv.y * data[vertex_indices.z];
     }
 
 protected:
@@ -53,12 +55,12 @@ protected:
 
         static constexpr u32 leafbit = 0x80000000;
 
-        CONST_FUNC BoxNode() noexcept
+        VEC_CONSTEXPR BoxNode() noexcept
         : box{}, index_l{0}, index_r{0} {}
-        CONST_FUNC BoxNode(vec3g const* vertices, indices const* faces, u32 face_start, u32 n_faces) noexcept
+        VEC_CONSTEXPR BoxNode(vec3g const* vertices, indices_t const* faces, u32 face_start, u32 n_faces) noexcept
         : box{}, index_l{face_start}, index_r{n_faces | leafbit} {
-            indices const* vertex_indices_p = &faces[face_start];
-            indices const* stop = vertex_indices_p + n_faces;
+            indices_t const* vertex_indices_p = &faces[face_start];
+            indices_t const* stop = vertex_indices_p + n_faces;
             for (; vertex_indices_p < stop; vertex_indices_p++)
             {
                 box.bound(vertices[vertex_indices_p->x]);
@@ -68,24 +70,24 @@ protected:
             box.prepare();
         }
 
-        CONST_FUNC bool isleaf() const noexcept
+        constexpr bool isleaf() const noexcept
         {
             return (index_r & leafbit) != 0;
         }
 
-        CONST_FUNC u32 leftchild() const noexcept
+        constexpr u32 leftchild() const noexcept
         {
             return index_l;
         }
-        CONST_FUNC u32 rightchild() const noexcept
+        constexpr u32 rightchild() const noexcept
         {
             return index_r;
         }
-        CONST_FUNC u32 triangle_start() const noexcept
+        constexpr u32 triangle_start() const noexcept
         {
             return index_l;
         }
-        CONST_FUNC u32 triangles_length() const noexcept
+        constexpr u32 triangles_length() const noexcept
         {
             return index_r & (~leafbit);
         }
@@ -103,15 +105,15 @@ protected:
         // pre-calculate some useful informations
         std::vector<std::tuple<vec3g, fg>> center_areas;
         center_areas.reserve(_faces.size());
-        for (indices vertex_indices : _faces)
+        for (indices_t vertex_indices : _faces)
         {
             vec3g const& A = _vertices[vertex_indices.x];
             vec3g const& B = _vertices[vertex_indices.y];
             vec3g const& C = _vertices[vertex_indices.z];
 
-            // old, correct behavior: ((B - A) + (C - A)).mul(defaults<fg>::third).add(A)
-            vec3g center = defaults<fg>::third * (A + B + C);
-            fg area = defaults<fg>::half * length(cross(B - A, C - A));
+            // old, correct behavior: ((B - A) + (C - A)).mul(consts<fg>::third).add(A)
+            vec3g center = consts<fg>::third * (A + B + C);
+            fg area = consts<fg>::half * length(cross(B - A, C - A));
 
             center_areas.emplace_back(center, area);
         }
@@ -143,7 +145,7 @@ protected:
                 for (u32 iter = 0; iter < max_strategy_iterations; iter++)
                 {
                     // set a new dividing line
-                    fg min_distance = defaults<fg>::inf, delta = box_size.x / (1 << (iter + 1));
+                    fg min_distance = consts<fg>::inf, delta = box_size.x / (1 << (iter + 1));
                     divide_line += delta * (left_area > right_area ? -1 : 1);
                     // calculate how many area in each side
                     left_area = right_area = 0;
@@ -164,7 +166,7 @@ protected:
                 for (u32 iter = 0; iter < max_strategy_iterations; iter++)
                 {
                     // set a new dividing line
-                    fg min_distance = defaults<fg>::inf, delta = box_size.y / (1 << (iter + 1));
+                    fg min_distance = consts<fg>::inf, delta = box_size.y / (1 << (iter + 1));
                     d_l += delta * (l_a > r_a ? -1 : 1);
                     // calculate how many area in each side
                     l_a = r_a = 0;
@@ -192,7 +194,7 @@ protected:
                 for (u32 iter = 0; iter < max_strategy_iterations; iter++)
                 {
                     // set a new dividing line
-                    fg min_distance = defaults<fg>::inf, delta = box_size.z / (1 << (iter + 1));
+                    fg min_distance = consts<fg>::inf, delta = box_size.z / (1 << (iter + 1));
                     d_l += delta * (l_a > r_a ? -1 : 1);
                     // calculate how many area in each side
                     l_a = r_a = 0;
@@ -215,7 +217,7 @@ protected:
                 }
 
                 // divide this box in halves if the divide strategy success
-                if ((left_area > defaults<fg>::eps) && (right_area > defaults<fg>::eps))
+                if ((left_area > consts<fg>::eps) && (right_area > consts<fg>::eps))
                 {
                     auto strategy_axis = [strategy] (vec3g const& center) noexcept -> fg
                     {
@@ -268,9 +270,9 @@ protected:
     std::vector<vec3g> _vertices;
     std::vector<vec3g> _vertex_normals;
     std::vector<vec2g> _vertex_uv;  // texture coordinate
-    std::vector<indices>  _faces;
-    std::vector<normal3g> _face_normals;
-    std::vector<vec3g>    _face_consts;
+    std::vector<indices_t>  _faces;
+    std::vector<normal3g>   _face_normals;
+    std::vector<vec3g>      _face_consts;
 
 public:
 
@@ -290,16 +292,17 @@ public:
         _face_consts.resize(_faces.size());
 
         bool build_vertex_normals = enable_normal_interpolation && !custom_vertex_normals;
-        if (build_vertex_normals) for (normal3g & normal : _vertex_normals) { normal = defaults<vec3g>::O; }
+        if (build_vertex_normals) for (normal3g & normal : _vertex_normals) { normal = consts<vec3g>::O; }
 
+        u64 const nv = _vertices.size();
         for (u32 face_index = 0; face_index < _faces.size(); face_index++)
         {
-            indices const& vertex_indices = _faces[face_index];
+            indices_t const& vertex_indices = _faces[face_index];
             normal3g & face_normal = _face_normals[face_index];
             vec3g & face_constants = _face_consts[face_index];
 
             // calculate face normal and some canstants
-            if (all(vertex_indices.isless(_vertices.size())))
+            if (vertex_indices.x < nv && vertex_indices.y < nv && vertex_indices.z < nv)
             {
                 vec3g const& A = _vertices[vertex_indices.x];
                 vec3g const& B = _vertices[vertex_indices.y];
@@ -307,9 +310,9 @@ public:
 
                 face_normal = normalize(cross(B - A, C - A));
 
-                face_constants.x = length2(B - A);
+                face_constants.x = dot(B - A, B - A);
                 face_constants.y = dot(B - A, C - A);
-                face_constants.z = length2(C - A);
+                face_constants.z = dot(C - A, C - A);
                 fg inv_det = 1 / (face_constants.x * face_constants.z - sqr(face_constants.y));
                 face_constants *= inv_det;
             }
@@ -321,11 +324,11 @@ public:
                 _vertex_normals[vertex_indices.z] += face_normal;
             }
         }
-        if (enable_normal_interpolation) for (normal3g & normal : _vertex_normals) { normal.normalize(); }
+        if (enable_normal_interpolation) for (normal3g & normal : _vertex_normals) { normal = normalize(normal); }
 
         _build_bounding_volume_hierarchy();
 
-#ifdef SHOW_TRACE_INFO
+#ifdef NYASRT_SHOW_TRACE_INFO
         std::cout << "# of triangles: " << _faces.size() << ", # of boxes: " << _boxes.size() << std::endl;
 #endif
         return prepared = true;
@@ -335,8 +338,8 @@ public:
     u32 add_vertex(vec3g const& vertex) noexcept
     {
         _vertices      .push_back(vertex);
-        _vertex_normals.push_back(defaults<vec3g>::Z);
-        _vertex_uv     .push_back(defaults<vec2g>::O);
+        _vertex_normals.push_back(consts<vec3g>::Z);
+        _vertex_uv     .push_back(consts<vec2g>::O);
         return _vertices.size() - 1;
     }
     u32 add_vertex(VertexInfo const& vertex) noexcept
@@ -349,9 +352,9 @@ public:
 
     u32 add_face(u32 A_index, u32 B_index, u32 C_index) noexcept
     {
-        return add_face(indices(A_index, B_index, C_index));
+        return add_face(indices_t(A_index, B_index, C_index));
     }
-    u32 add_face(indices const& vertex_indices) noexcept
+    u32 add_face(indices_t const& vertex_indices) noexcept
     {
         _faces.push_back(vertex_indices);
         return _faces.size() - 1;
@@ -372,9 +375,9 @@ public:
 
     Mesh & face(u32 index, u32 A_index, u32 B_index, u32 C_index) noexcept
     {
-        return face(index, indices(A_index, B_index, C_index));
+        return face(index, indices_t(A_index, B_index, C_index));
     }
-    Mesh & face(u32 index, indices const& vertex_indices) noexcept
+    Mesh & face(u32 index, indices_t const& vertex_indices) noexcept
     {
         _faces[index] = vertex_indices;
         return *this;
@@ -401,7 +404,7 @@ public:
         info.texture_coordinate = _vertex_uv[index];
         return info;
     }
-    indices face(u32 index) const noexcept
+    indices_t face(u32 index) const noexcept
     {
         return _faces[index];
     }
@@ -427,7 +430,7 @@ public:
         std::vector<vec3g> new_vertices;
         std::vector<vec3g> new_vertex_normals;
         std::vector<vec2g> new_vertex_uv;  // texture coordinate
-        std::vector<indices> new_faces;
+        std::vector<indices_t> new_faces;
         new_vertices.reserve(_faces.size() * (((subdivision + 1) * (subdivision + 2)) >> 1));
         new_vertex_normals.reserve(new_vertices.size());
         new_vertex_uv.reserve(new_vertices.size());
@@ -435,16 +438,16 @@ public:
         // TODO: vertex normals
 
         u32 v_index = 0;
-        for (indices const& vertex_indices : _faces)
+        for (indices_t const& vertex_indices : _faces)
         {
             for (u32 v_i = 0; v_i <= subdivision; v_i++)
             {
                 for (u32 u_i = 0; u_i <= subdivision - v_i; u_i++)
                 {
-                    vec2g uv = vec2g(u_i, v_i) / subdivision;
-                    new_vertices      .push_back(interpolate(_vertices      .data(), vertex_indices, uv));
-                    new_vertex_normals.push_back(interpolate(_vertex_normals.data(), vertex_indices, uv));
-                    new_vertex_uv     .push_back(interpolate(_vertex_uv     .data(), vertex_indices, uv));
+                    vec2g uv = vec2g(u_i, v_i) / fg(subdivision);
+                    new_vertices      .push_back(trinterpolate(_vertices      .data(), vertex_indices, uv));
+                    new_vertex_normals.push_back(trinterpolate(_vertex_normals.data(), vertex_indices, uv));
+                    new_vertex_uv     .push_back(trinterpolate(_vertex_uv     .data(), vertex_indices, uv));
                 }
             }
 
@@ -475,7 +478,7 @@ public:
 
     bool trace_face(u32 face_index, Ray const& ray, TraceRecord & rec)  const noexcept
     {
-        indices const& vertex_indices = _faces[face_index];
+        indices_t const& vertex_indices = _faces[face_index];
         normal3g const& face_normal = _face_normals[face_index];
         vec3g const& face_constants = _face_consts[face_index];
         vec3g const& A = _vertices[vertex_indices.x];
@@ -487,7 +490,7 @@ public:
         if (d_dot_n >= 0) { return false; }
 
         fg hit_time = dot(A - ray.origin, face_normal) / d_dot_n;
-        if ((hit_time < defaults<fg>::eps) || (hit_time >= rec.max_ray_time)) { return false; }
+        if ((hit_time < consts<fg>::eps) || (hit_time >= rec.max_ray_time)) { return false; }
 
         vec3g hit_point = ray.at(hit_time);
         vec3g coord_point = hit_point - A;
@@ -502,10 +505,10 @@ public:
         rec.face_normal = face_normal;
         rec.hit_normal = face_normal;
         rec.hit_face = vec2g(contra_u, contra_v);
-        rec.hit_texture = interpolate(_vertex_uv.data(), vertex_indices, rec.hit_face);
+        rec.hit_texture = trinterpolate(_vertex_uv.data(), vertex_indices, rec.hit_face);
         if (enable_normal_interpolation)
         {
-            rec.hit_normal = interpolate(_vertex_normals.data(), vertex_indices, rec.hit_face);
+            rec.hit_normal = trinterpolate(_vertex_normals.data(), vertex_indices, rec.hit_face);
         }
         return true;
     }
@@ -513,10 +516,10 @@ public:
     bool trace(Ray const& ray, TraceRecord & rec) const noexcept
     {
         auto [time_in, time_out] = _boxes.front().box.trace(ray);
-#ifdef SHOW_TRACE_INFO
+#ifdef NYASRT_SHOW_TRACE_INFO
         rec.box_count++;
 #endif
-        if ((time_out < defaults<fg>::eps) || (time_in >= time_out)) { return false; }
+        if ((time_out < consts<fg>::eps) || (time_in >= time_out)) { return false; }
 
         using StackEltype = std::tuple<BoxNode const* /* box */, fg /* time_in */>;
         StackEltype to_trace_boxes[max_boxes_depth + 1];
@@ -537,7 +540,7 @@ public:
                 for (u32 face_index = box_node.triangle_start(); face_index < stop; face_index++)
                 {
                     hit |= trace_face(face_index, ray, rec);
-#ifdef SHOW_TRACE_INFO
+#ifdef NYASRT_SHOW_TRACE_INFO
                     rec.triangle_count++;
 #endif
                 }
@@ -549,7 +552,7 @@ public:
                 BoxNode const* child_r = &_boxes[box_node.rightchild()];
                 auto [in_l, out_l] = child_l->box.trace(ray);
                 auto [in_r, out_r] = child_r->box.trace(ray);
-#ifdef SHOW_TRACE_INFO
+#ifdef NYASRT_SHOW_TRACE_INFO
                 rec.box_count += 2;
 #endif
 
@@ -562,11 +565,11 @@ public:
                 }
 
                 // push them in to stack (or not)
-                if ((out_r >= defaults<fg>::eps) && (in_r < out_r))
+                if ((out_r >= consts<fg>::eps) && (in_r < out_r))
                 {
                     *(++box_p) = {child_r, in_r};
                 }
-                if ((out_l >= defaults<fg>::eps) && (in_l < out_l))
+                if ((out_l >= consts<fg>::eps) && (in_l < out_l))
                 {
                     *(++box_p) = {child_l, in_l};
                 }
@@ -578,7 +581,7 @@ public:
 
     bool test_hit_face(u32 face_index, Ray const& ray, fg max_ray_time) const noexcept
     {
-        indices const& vertex_indices = _faces[face_index];
+        indices_t const& vertex_indices = _faces[face_index];
         normal3g const& face_normal = _face_normals[face_index];
         vec3g const& face_constants = _face_consts[face_index];
         vec3g const& A = _vertices[vertex_indices.x];
@@ -590,7 +593,7 @@ public:
         if (d_dot_n >= 0) { return false; }
 
         fg hit_time = dot(A - ray.origin, face_normal) / d_dot_n;
-        if ((hit_time < defaults<fg>::eps) || (hit_time >= max_ray_time)) { return false; }
+        if ((hit_time < consts<fg>::eps) || (hit_time >= max_ray_time)) { return false; }
 
         vec3g hit_point = ray.at(hit_time);
         vec3g coord_point = hit_point - A;
@@ -606,7 +609,7 @@ public:
     bool test_hit(Ray const& ray, fg max_ray_time) const noexcept
     {
         auto [time_in, time_out] = _boxes.front().box.trace(ray);
-        if ((time_out < defaults<fg>::eps) || (time_in >= time_out)) { return false; }
+        if ((time_out < consts<fg>::eps) || (time_in >= time_out)) { return false; }
 
         using StackEltype = std::tuple<BoxNode const* /* box */, fg /* time_in */>;
         StackEltype to_trace_boxes[max_boxes_depth + 1];
@@ -637,11 +640,11 @@ public:
                 auto [in_r, out_r] = child_r->box.trace(ray);
 
                 // push them in to stack (or not)
-                if ((out_r >= defaults<fg>::eps) && (in_r < out_r))
+                if ((out_r >= consts<fg>::eps) && (in_r < out_r))
                 {
                     *(++box_p) = {child_r, in_r};
                 }
-                if ((out_l >= defaults<fg>::eps) && (in_l < out_l))
+                if ((out_l >= consts<fg>::eps) && (in_l < out_l))
                 {
                     *(++box_p) = {child_l, in_l};
                 }
@@ -679,7 +682,7 @@ MeshPtr Mesh::load_obj(std::ifstream & file)
     MeshPtr mesh_p = std::make_shared<Mesh>();
     if (!file.is_open()) { return mesh_p; }
 
-    vec3g v; vec3<u32> indeces;
+    vec3g v; indices_t v_indeces;
 
     for (std::string line, part; std::getline(file, line);)
     {
@@ -696,12 +699,12 @@ MeshPtr Mesh::load_obj(std::ifstream & file)
         }
         else if (part == "f")   // polygonal face element
         {
-            line_buff >> part; indeces.x = s2n<u32>(part);
-            line_buff >> part; indeces.y = s2n<u32>(part);
-            line_buff >> part; indeces.z = s2n<u32>(part);
+            line_buff >> part; v_indeces.x = s2n<u32>(part);
+            line_buff >> part; v_indeces.y = s2n<u32>(part);
+            line_buff >> part; v_indeces.z = s2n<u32>(part);
             // TODO: support many indces `.../.../...`
             // TODO: slpit polygon to triangles
-            mesh_p->add_face(indeces - 1);
+            mesh_p->add_face(v_indeces - indices_t(1));
         }
     }
 
@@ -714,14 +717,14 @@ MeshPtr Mesh::tetrahedron()
     mesh_p->reserve_vertices(4).reserve_faces(4);
 
     f32 root2 = std::sqrt(2.0f);
-    f32 z = -defaults<f32>::third;
+    f32 z = -consts<f32>::third;
     f32 x1 = 2 * root2 / 3;
     f32 x2 = -root2 / 3;
     f32 y = std::sqrt(2.0f / 3.0f);
 
     u32 top               = mesh_p->add_vertex(vec3g(0,   0, 1));
     u32 bottom_front      = mesh_p->add_vertex(vec3g(x1,  0, z));
-    u32 bottom_back_left  = mesh_p->add_vertex(vec3g(x2, -y, z));
+    u32 bottom_back_left  = mesh_p->add_vertex(vec3g(x2,  y, z));
     u32 bottom_back_right = mesh_p->add_vertex(vec3g(x2, -y, z));
 
     mesh_p->add_face(top, bottom_back_right, bottom_front);
@@ -803,15 +806,15 @@ MeshPtr Mesh::uv_sphere(u32 n_longitude, u32 n_latitude)
     MeshPtr mesh_p = std::make_shared<Mesh>();
     mesh_p->reserve_vertices(n_longitude * n_latitude * 2).reserve_faces(n_longitude * n_latitude + 2);
 
-    mesh_p->add_vertex(VertexInfo{ defaults<vec3g>::Z,  defaults<vec3g>::Z, defaults<vec2g>::Y});    // top vertex
-    mesh_p->add_vertex(VertexInfo{-defaults<vec3g>::Z, -defaults<vec3g>::Z, defaults<vec2g>::O});    // bottom vertex
+    mesh_p->add_vertex(VertexInfo{ consts<vec3g>::Z,  consts<vec3g>::Z, consts<vec2g>::Y});    // top vertex
+    mesh_p->add_vertex(VertexInfo{-consts<vec3g>::Z, -consts<vec3g>::Z, consts<vec2g>::O});    // bottom vertex
     for (u32 v = 0; v < n_latitude; v++)
     {
-        fg theta = defaults<fg>::pi * (v + 1) / (n_latitude + 1);
+        fg theta = consts<fg>::pi * (v + 1) / (n_latitude + 1);
         fg stheta = std::sin(theta), ctheta = std::cos(theta);
         for (u32 u = 0; u < n_longitude; u++)
         {
-            fg phi = defaults<fg>::two_pi * u / n_longitude;
+            fg phi = consts<fg>::two_pi * u / n_longitude;
             fg sphi = std::sin(phi), cphi = std::cos(phi);
 
             VertexInfo vertex;
@@ -857,12 +860,12 @@ MeshPtr Mesh::torus(fg tube_radius, u32 n_a, u32 n_b)
     VertexInfo vertex;
     for (u32 b = 0; b <= n_b; b++)
     {
-        fg theta = defaults<fg>::two_pi * b / n_b;
+        fg theta = consts<fg>::two_pi * b / n_b;
         fg xx = std::cos(theta), yy = std::sin(theta);
 
         for (u32 a = 0; a <= n_a; a++)
         {
-            fg phi = defaults<fg>::two_pi * a / n_a;
+            fg phi = consts<fg>::two_pi * a / n_a;
             fg x = std::cos(phi), z = std::sin(phi);
 
             vertex.position = vec3g((tube_radius * x + 1) * xx, (tube_radius * x + 1) * yy, tube_radius * z);
@@ -882,3 +885,5 @@ MeshPtr Mesh::torus(fg tube_radius, u32 n_a, u32 n_b)
     mesh_p->custom_vertex_normals = true;
     return mesh_p;
 }
+
+} // namespace nyasRT

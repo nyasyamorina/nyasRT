@@ -1,5 +1,13 @@
-.*
+build/*
 
-build
-out_*
-TODO*
+third-party/*
+!third-party/README.md
+
+.models/*
+.textures/*
+.vscode/*
+
+TODOLists.txt
+
+out_16.qoi
+out_trace_info.qoi

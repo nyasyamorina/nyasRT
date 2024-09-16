@@ -2,97 +2,94 @@
 
 #include <math.h>
 
-#include "../utils.hpp"
-#include "vec3.hpp"
-#include "vec4.hpp"
+#include "../common.hpp"
 #include "Ray.hpp"
 
 
+namespace nyasRT
+{
 class Rotation;
-CONST_FUNC Rotation operator * (Rotation const& second, Rotation const& first) noexcept;
+VEC_CONSTEXPR Rotation operator*(Rotation const& second, Rotation const& first) noexcept;
 
 class Rotation final
 {
 public:
 
-    normal4g quaternion;
+    using quaternion = vec4g;
 
-    CONST_FUNC Rotation() noexcept
-    : quaternion{defaults<vec4g>::W} {}
-    CONST_FUNC Rotation(normal4g const& q) noexcept
-    : quaternion{q} {}
-    CONST_FUNC Rotation(normal3g const& axis, fg angle) noexcept
-    : quaternion{std::sin(defaults<fg>::half * angle) * axis, std::cos(defaults<fg>::half * angle)} {}
-    CONST_FUNC Rotation(fg yaw, fg pitch, fg roll) noexcept
+    static constexpr inline fg real(quaternion const& q) noexcept
     {
-        *this = Rotation(defaults<vec3g>::Z, yaw) * Rotation(defaults<vec3g>::Y, pitch) * Rotation(defaults<vec3g>::X, roll);
+        return q.w;
     }
-
-
-    CONST_FUNC Rotation & operator *= (Rotation const& rot) noexcept
+    static VEC_CONSTEXPR inline vec3g imag(quaternion const& q) noexcept
     {
-        quaternion = qmul(rot.quaternion, quaternion);
-        return *this;
+        return vec3g(q.x, q.y, q.z);
     }
-    CONST_FUNC Rotation & operator ^= (fg s) noexcept
+    static VEC_CONSTEXPR inline quaternion qconj(quaternion const& q) noexcept
     {
-        vec3g axis = quaternion.xyz();
-        fg len = length(axis);
-        if (len < defaults<fg>::eps) { return *this; }
-        fg half_angle = std::atan2(len, quaternion.w) * s;
-        quaternion = vec4g((std::sin(half_angle) / len) * axis, std::cos(half_angle));
-        return *this;
+        return quaternion(-imag(q), real(q));
+    }
+    static VEC_CONSTEXPR inline quaternion qmul(quaternion const& l, quaternion const& r) noexcept
+    {
+        fg const              Rl = real(l), Rr = real(r);
+        ::nyasRT::vec3g const Il = imag(l), Ir = imag(r);
+        return quaternion(Rl * Ir + Rr * Il + cross(Il, Ir), Rl * Rr - dot(Il, Ir));
     }
 
-    CONST_FUNC Rotation & mul(Rotation const& rot) noexcept
+
+    quaternion q;
+
+    VEC_CONSTEXPR Rotation() noexcept
+    : q{consts<vec4g>::W} {}
+    explicit VEC_CONSTEXPR Rotation(quaternion const& q_) noexcept
+    : q{q_} {}
+    VEC_CONSTEXPR Rotation(normal3g const& axis, fg angle) noexcept
+    : q{std::sin(consts<fg>::half * angle) * axis, std::cos(consts<fg>::half * angle)} {}
+    VEC_CONSTEXPR Rotation(fg yaw, fg pitch, fg roll) noexcept
     {
-        return ((*this) *= rot);
+        *this = Rotation(consts<vec3g>::Z, yaw) * Rotation(consts<vec3g>::Y, pitch) * Rotation(consts<vec3g>::X, roll);
     }
 
-    CONST_FUNC normal3g axis() const noexcept
+
+    VEC_CONSTEXPR normal3g axis() const noexcept
     {
-        return quaternion.xyz().normalize();
+        using namespace glm;
+        return normalize(imag(q));
     }
-    CONST_FUNC fg angle() const noexcept
+    VEC_CONSTEXPR fg angle() const noexcept
     {
-        return 2 * std::atan2(length(quaternion.xyz()), quaternion.w);
+        using namespace glm;
+        return 2 * std::atan2(length(imag(q)), real(q));
     }
 
-    CONST_FUNC Rotation inverse() const noexcept
+    VEC_CONSTEXPR Rotation inverse() const noexcept
     {
-        return Rotation(qconj(quaternion));
+        return Rotation(qconj(q));
     }
 
-    CONST_FUNC vec3g apply(vec3g const& v) const noexcept
+    VEC_CONSTEXPR vec3g apply(vec3g const& v) const noexcept
     {
-        return qmul(qmul(quaternion, vec4g(v, 0)), qconj(quaternion)).xyz();
+        return imag(qmul(qmul(q, vec4g(v, 0)), qconj(q)));
     }
-    CONST_FUNC vec3g undo(vec3g const& v) const noexcept
+    VEC_CONSTEXPR vec3g undo(vec3g const& v) const noexcept
     {
-        return qmul(qmul(qconj(quaternion), vec4g(v, 0)), quaternion).xyz();
+        return imag(qmul(qmul(qconj(q), vec4g(v, 0)), q));
     }
 };
 
-CONST_FUNC Rotation operator + (Rotation const& rot) noexcept
+VEC_CONSTEXPR inline Rotation operator*(Rotation const& second, Rotation const& first) noexcept
 {
-    return rot;
+    return Rotation(Rotation::qmul(second.q, first.q));
 }
-CONST_FUNC Rotation operator - (Rotation const& rot) noexcept
+inline Rotation operator^(Rotation const& rot, fg s) noexcept
 {
-    return Rotation(qconj(rot.quaternion));
-}
-CONST_FUNC Rotation operator * (Rotation const& second, Rotation const& first) noexcept
-{
-    return Rotation(qmul(second.quaternion, first.quaternion));
-}
-CONST_FUNC Rotation operator ^ (Rotation const& rot, fg s) noexcept
-{
+    using namespace glm;
     Rotation new_rot;
-    vec3g axis = rot.quaternion.xyz();
-    fg len = length(axis);
-    if (len < defaults<fg>::eps) { return new_rot; }
-    fg half_angle = std::atan2(len, rot.quaternion.w) * s;
-    new_rot.quaternion = vec4g((std::sin(half_angle) / len) * axis, std::cos(half_angle));
+    vec3g const axis = Rotation::imag(rot.q);
+    fg const len = length(axis);
+    if (len < consts<fg>::eps) { return new_rot; }
+    fg const half_angle = std::atan2(len, Rotation::real(rot.q)) * s;
+    new_rot.q = vec4g((std::sin(half_angle) / len) * axis, std::cos(half_angle));
     return new_rot;
 }
 
@@ -106,32 +103,32 @@ public:
     fg scaler;
     vec3g offset;
 
-    CONST_FUNC Transform() noexcept
-    : rotation{}, scaler{1}, offset{defaults<vec3g>::O} {}
+    VEC_CONSTEXPR Transform() noexcept
+    : rotation{}, scaler{1}, offset{consts<vec3g>::O} {}
 
-    CONST_FUNC Transform & rotate(normal3g const& axis, fg angle) noexcept
+    VEC_CONSTEXPR Transform & rotate(normal3g const& axis, fg angle) noexcept
     {
         return rotate(Rotation(axis, angle));
     }
-    CONST_FUNC Transform & rotate(Rotation const& rot) noexcept
+    VEC_CONSTEXPR Transform & rotate(Rotation const& rot) noexcept
     {
-        rotation *= rot;
+        rotation = rot * rotation;
         offset = rot.apply(offset);
         return *this;
     }
-    CONST_FUNC Transform & scale(fg scale_) noexcept
+    VEC_CONSTEXPR Transform & scale(fg scale_) noexcept
     {
         scaler *= scale_;
         offset *= scale_;
         return *this;
     }
-    CONST_FUNC Transform & shift(vec3g const& offset_) noexcept
+    VEC_CONSTEXPR Transform & shift(vec3g const& offset_) noexcept
     {
         offset += offset_;
         return *this;
     }
 
-    CONST_FUNC Transform inverse() const noexcept
+    VEC_CONSTEXPR Transform inverse() const noexcept
     {
         Transform inv;
         inv.rotation = rotation.inverse();
@@ -140,37 +137,39 @@ public:
         return inv;
     }
 
-    CONST_FUNC vec3g apply_normal(vec3g const& n) const noexcept
+    VEC_CONSTEXPR vec3g apply_normal(vec3g const& n) const noexcept
     {
         return rotation.apply(n);
     }
-    CONST_FUNC vec3g undo_normal(vec3g const& n) const noexcept
+    VEC_CONSTEXPR vec3g undo_normal(vec3g const& n) const noexcept
     {
         return rotation.undo(n);
     }
-    CONST_FUNC vec3g apply_vector(vec3g const& v) const noexcept
+    VEC_CONSTEXPR vec3g apply_vector(vec3g const& v) const noexcept
     {
-        return apply_normal(v).mul(scaler);
+        return apply_normal(v) / scaler;
     }
-    CONST_FUNC vec3g undo_vector(vec3g const& v) const noexcept
+    VEC_CONSTEXPR vec3g undo_vector(vec3g const& v) const noexcept
     {
-        return undo_normal(v).div(scaler);
+        return undo_normal(v) / scaler;
     }
-    CONST_FUNC vec3g apply_point(vec3g const& p) const noexcept
+    VEC_CONSTEXPR vec3g apply_point(vec3g const& p) const noexcept
     {
-        return apply_vector(p).add(offset);
+        return apply_vector(p) + offset;
     }
-    CONST_FUNC vec3g undo_point(vec3g const& p) const noexcept
+    VEC_CONSTEXPR vec3g undo_point(vec3g const& p) const noexcept
     {
         return undo_vector(p - offset);
     }
 
-    CONST_FUNC Ray apply(Ray const& ray) const noexcept
+    VEC_CONSTEXPR Ray apply(Ray const& ray) const noexcept
     {
         return Ray(apply_point(ray.origin), apply_vector(ray.direction));
     }
-    CONST_FUNC Ray undo(Ray const& ray) const noexcept
+    VEC_CONSTEXPR Ray undo(Ray const& ray) const noexcept
     {
         return Ray(undo_point(ray.origin), undo_vector(ray.direction));
     }
 };
+
+} // namespace nyasRT

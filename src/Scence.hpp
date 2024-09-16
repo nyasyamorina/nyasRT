@@ -4,16 +4,24 @@
 #include <thread>
 #include <vector>
 
-#include "utils.hpp"
-#include "Object3D.hpp"
+#include "common.hpp"
+#include "components/Object3D.hpp"
 #include "geometry/Ray.hpp"
-#include "cameras/Camera.hpp"
-#include "sky_models/Sky.hpp"
-#include "light_sources/LightSource.hpp"
+#include "components/cameras/Camera.hpp"
+#include "components/sky_models/Sky.hpp"
+#include "components/light_sources/LightSource.hpp"
 
 
+namespace nyasRT
+{
 class Scence
 {
+public:
+
+    using CameraPtr = std::shared_ptr<cameras::Camera>;
+    using LightSourcePtr = std::shared_ptr<light_sources::LightSource>;
+    using SkyPtr = std::shared_ptr<sky_models::Sky>;
+
 protected:
 
     bool _prepared;
@@ -79,11 +87,11 @@ public:
     {
         return _camera_p;
     }
-    CameraConstPtr camera() const noexcept
+    CameraPtr camera() const noexcept
     {
         return _camera_p;
     }
-    Camera const& camera_ref() const noexcept
+    cameras::Camera const& camera_ref() const noexcept
     {
         return *_camera_p;
     }
@@ -91,11 +99,11 @@ public:
     {
         return _sky_p;
     }
-    SkyConstPtr sky() const noexcept
+    SkyPtr sky() const noexcept
     {
         return _sky_p;
     }
-    Sky const& sky_ref() const noexcept
+    sky_models::Sky const& sky_ref() const noexcept
     {
         return *_sky_p;
     }
@@ -121,5 +129,4 @@ public:
     }
 };
 
-using ScencePtr = std::shared_ptr<Scence>;
-using ScenceConstPtr = std::shared_ptr<Scence const>;
+} // namespace nyasRT
