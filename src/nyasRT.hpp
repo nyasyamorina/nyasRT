@@ -7,6 +7,7 @@
 #include "geometry/BoundingBox.hpp"
 #include "geometry/Transform.hpp"
 #include "graphics/GraphicsBuffer.hpp"
+#include "graphics/DisplayWindow.hpp"
 #include "graphics/Interpolation.hpp"
 #include "graphics/post_process.hpp"
 #include "graphics/image_formats/Formatter.hpp"

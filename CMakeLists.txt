@@ -21,4 +21,5 @@ else()
     endif()
 endif()
 
-add_executable(nyasRT main.cpp)
+set(SOURCE_FILES main.cpp RGFW_IMPLEMENTATION.cpp)
+add_executable(nyasRT ${SOURCE_FILES})

@@ -5,6 +5,7 @@
 
 //#define NYASRT_USE_DOUBLE_PRECISION_GEOMETRY
 //#define NYASRT_SHOW_TRACE_INFO
+//#define NYASRT_DISPLAY_PROGRESS
 
 #include "src/nyasRT.hpp"
 #include "scences.hpp"
@@ -33,7 +34,7 @@ i32 main(i32, char * *)
     bool scence_prepared = false;
     nyasRT::GraphicsBuffer fig(figure_size);
 
-    f32 building_time = nyasRT::timeit("building scenece & figure", [&] ()
+    f32 building_time = nyasRT::timeit([&] ()
     {
         using nyasRT::remove_gamma;
 
@@ -76,7 +77,7 @@ i32 main(i32, char * *)
     nyasRT::RenderConfig config{nyasRT::SampleType::MultiJittered, 83u, rays_per_pixel, max_ray_bounds};
     nyasRT::Renderer renderer(*scence_p, config);
 
-    f32 rendering_time = nyasRT::timeit("rendering using 16 threads", [&] ()
+    f32 rendering_time = nyasRT::timeit([&] ()
     {
         renderer.render(fig, 16);
     });
@@ -88,7 +89,7 @@ i32 main(i32, char * *)
 
     output_ready(ACES_tone_mapping(auto_exposure(fig)));
 
-    if (!(QOI().save("../../out_16.qoi", fig)))
+    if (!(QOI().save("../../out.qoi", fig)))
 #endif
     {
         std::cout << "failed to write figure into file" << std::endl;

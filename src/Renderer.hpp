@@ -9,6 +9,7 @@
 #include "common.hpp"
 #include "geometry/Ray.hpp"
 #include "graphics/GraphicsBuffer.hpp"
+#include "graphics/DisplayWindow.hpp"
 #include "components/Object3D.hpp"
 #include "Sampler.hpp"
 #include "Scence.hpp"
@@ -99,6 +100,9 @@ protected:
     static constexpr f32 trace_info_max_bbox_count = 10;
     static constexpr f32 trace_info_max_face_count = 10;
     static constexpr f32 trace_info_max_trace_count = 2;
+
+    static constexpr f32 display_framerate = 30;
+
 
     Scence const& _scence;
 
@@ -207,19 +211,60 @@ public:
         if (!_scence.prepared()) { return; }
         sampler.init(config.sample_type, config.n_sample_sets, config.rays_pre_pixel);
 
+#if defined(NYASRT_DISPLAY_PROGRESS)
+        using namespace std::chrono;
+
+        gbuf.fill(consts<RGB>::Black);
+        DisplayWindow window(gbuf);
+        window.refresh();
+
+        constexpr auto refresh_interval = microseconds(u64(1e6 / display_framerate));
+        auto next_refresh_time = system_clock::now() + refresh_interval;
+#endif
+
         vec2g pixel_size = gbuf.pixel_size();
 
         for (SubBuffer iterator(gbuf); auto & iter : iterator)
         {
             vec2g center = gbuf.position(iter.global_index());
             iter.pixel() = render_pixel(center, pixel_size);
+
+#if defined(NYASRT_DISPLAY_PROGRESS)
+            if (system_clock::now() >= next_refresh_time)
+            {
+                window.refresh();
+                next_refresh_time += refresh_interval;
+            }
+#endif
         }
+
+#if defined(NYASRT_DISPLAY_PROGRESS)
+        // wait for window closed
+        /* while (!window.should_close())
+        {
+            window.refresh();
+            std::this_thread::sleep_for(refresh_interval);
+        } */
+#endif
     }
     void render(GraphicsBuffer & gbuf, u32 n_threads) const
     {
         if (!_scence.prepared()) { return; }
 
+#if defined(NYASRT_DISPLAY_PROGRESS)
+        using namespace std::chrono;
+
+        gbuf.fill(consts<RGB>::Black);
+        DisplayWindow window(gbuf);
+        window.refresh();
+
+        constexpr auto refresh_interval = microseconds(u64(1e6 / display_framerate));
+        auto next_refresh_time = system_clock::now() + refresh_interval;
+#endif
+
+        std::vector<bool> threads_done;
         std::vector<std::thread> threads;
+        threads_done.reserve(n_threads);
         threads.reserve(n_threads);
 
         vec2g pixel_size = gbuf.pixel_size();
@@ -228,7 +273,8 @@ public:
 
         for (u32 k = 0; k < n_threads; k++)
         {
-            threads.emplace_back([&, this] () noexcept
+            threads_done.emplace_back(false);
+            threads.emplace_back([&, this, k] () noexcept
             {
                 sampler.init(config.sample_type, config.n_sample_sets, config.rays_pre_pixel);
                 index2_t task_start;
@@ -250,13 +296,36 @@ public:
                         iter.pixel() = render_pixel(center, pixel_size);
                     }
                 }
+
+                threads_done[k] = true;
             });
         }
 
-        for (std::thread & thread : threads)
+        u32 thread_index = 0;
+        while (thread_index < n_threads)
         {
-            thread.join();
+            if (threads_done[thread_index])
+            {
+                threads[thread_index].join();
+                thread_index++;
+            }
+
+#if defined(NYASRT_DISPLAY_PROGRESS)
+            if (system_clock::now() >= next_refresh_time)
+            {
+                window.refresh();
+                next_refresh_time += refresh_interval;
+            }
+#endif
         }
+#if defined(NYASRT_DISPLAY_PROGRESS)
+        // wait for window closed
+        /* while (!window.should_close())
+        {
+            window.refresh();
+            std::this_thread::sleep_for(refresh_interval);
+        } */
+#endif
     }
 };
 

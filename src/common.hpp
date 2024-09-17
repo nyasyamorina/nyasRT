@@ -354,7 +354,7 @@ template<> inline f64 s2n<f64>(std::string const& str)
 
 /********** timer **********/
 
-inline f32 timeit(std::string const& name, std::function<void()> const& func) noexcept
+inline f32 timeit(std::function<void()> const& func) noexcept
 {
     using namespace std::chrono;
 
